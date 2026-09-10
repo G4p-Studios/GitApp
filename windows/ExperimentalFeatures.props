@@ -24,4 +24,30 @@
     <ReactExperimentalFeaturesSet>true</ReactExperimentalFeaturesSet>
   </PropertyGroup>
 
+  <PropertyGroup Label="Windows SDK">
+    <!--
+      Pin the Windows SDK explicitly.
+
+      The template ships WindowsTargetPlatformVersion as "10.0", meaning
+      "latest installed". RNW's Microsoft.ReactNative.WindowsSdk.Default.props
+      then applies its New Architecture floor:
+
+        Condition="'$(RnwNewArch)'=='true' And VersionLessThan(..., '10.0.22621.0')"
+
+      "10.0" compares as less than 10.0.22621.0, so the floor rewrites the
+      value to a literal 10.0.22621.0 rather than leaving it as "latest". On a
+      machine without that exact SDK the build fails with MSB8036, even though
+      a newer SDK is installed.
+
+      Setting it here works because both gitapp.vcxproj and
+      gitapp.Package.wapproj import this file before the RNW property sheet,
+      whose defaults are all conditional on the value being empty.
+
+      Raise this when the build machines move to a newer SDK. The min version
+      is deliberately left alone so the app still runs on older Windows.
+    -->
+    <WindowsTargetPlatformVersion>10.0.26100.0</WindowsTargetPlatformVersion>
+    <TargetPlatformVersion>10.0.26100.0</TargetPlatformVersion>
+  </PropertyGroup>
+
 </Project>
