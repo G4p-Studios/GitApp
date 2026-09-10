@@ -85,6 +85,49 @@ The spike rendered in dark mode with zero configuration. On RNW this needed
 three hand-written palettes and a custom hook, because no `PlatformColor`
 name returns dark values under Fabric (`docs/ARCHITECTURE.md` 3.8).
 
+### What NVDA actually says
+
+Captured from NVDA 2026.2's Speech Viewer, read out of its edit control.
+
+Activating the window:
+
+```
+MAUI A11y Spike
+Repositories  grouping
+Repositories  list
+gitapp, main, 2 ahead  1 of 4
+```
+
+Arrowing down twice, then Tab:
+
+```
+react-native-windows, main, 14 behind  2 of 4
+nvda, master, up to date  3 of 4
+Repository details  grouping
+Fetch  button  Downloads new commits without changing your working tree
+```
+
+Two things to draw out.
+
+**Set positions are spoken.** "1 of 4", "2 of 4", "3 of 4", with no code on
+our side. This is the behaviour the RNW `List` primitive computes by hand.
+
+**The activation announcement is largely intact.** Compare against the same
+measurement on the other three apps:
+
+| App | NVDA on activation |
+| --- | --- |
+| Gallery (Legacy), Paper/UWP | title, "window", focused control |
+| Gallery, RNW Fabric | title only |
+| GitApp, RNW Fabric | title only |
+| This spike, MAUI 10 | title, containing group, list, **focused control with its position** |
+
+MAUI does not say the word "window", so it is not identical to the legacy
+UWP behaviour. But it announces the full context chain down to the focused
+item, which is the part of the regression that actually leaves a screen
+reader user stranded. Prediction made before measuring was that MAUI would
+behave like Fabric here. That was wrong.
+
 ## What it costs to hand-build the same thing
 
 | | RNW Fabric | MAUI 10 |
@@ -104,13 +147,12 @@ Line count for the equivalent surface: **1,547 lines** in `src/a11y` and
 
 ## Caveats, stated plainly
 
-- **This probably does not fix the bug that started the discussion.** The MAUI
-  window is `WinUIDesktopWin32WindowClass`, which is a plain desktop window
-  like Fabric's, not the UWP `ApplicationFrameWindow` that produced the
-  "<title> window" announcement. Confirming needs an NVDA listen-through;
-  Speech Viewer was closed by the time the spike was running. Expect the
-  activation announcement to be missing in MAUI too. It is not a reason to
-  switch, and not a reason to stay.
+- **The activation bug is mostly fixed, contrary to the prediction made
+  before this was measured.** See the NVDA section above. The word "window"
+  is still absent, because the MAUI window is `WinUIDesktopWin32WindowClass`
+  rather than a UWP `ApplicationFrameWindow`. But the substantive half, the
+  focused control being announced on activation, works. That was the part
+  worth caring about.
 - **macOS means Mac Catalyst**, not native AppKit. Native macOS remains a
   discussion upstream. A Catalyst app is an iOS UI on the Mac and VoiceOver
   treats it that way. This should be tested on real hardware before macOS is
