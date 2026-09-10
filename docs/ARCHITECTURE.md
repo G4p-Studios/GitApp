@@ -67,6 +67,24 @@ PositionInSet and SizeOfSet, means a correct screen-reader tree **is** buildable
 in RNW. It is not free, but it is not blocked either. The same applies to lists
 reporting "item 7 of 240".
 
+### 2.2a Which role prop to use
+
+`accessibilityRole` and `role` are not aliases. They resolve through two
+separate native functions, `GetControlTypeFromString` and
+`GetControlTypeFromRole` respectively, and neither covers everything. Choosing
+the wrong one degrades silently to a Group with no warning at build or run time.
+
+- Use **`accessibilityRole`** for: `pane`, `tree`, `treeitem`, `keyboardkey`,
+  `splitbutton`, `toolbar`, `menubar`, `list`, `listitem`, and the ordinary
+  control roles.
+- Use **`role`** for: `status` (the only route to UIA StatusBar), `table`,
+  `application`, `document`, `separator`, `columnheader`, `rowheader`.
+
+The TypeScript surface lags the native mapping in at least one place:
+`accessibilityRole="pane"` is accepted natively but missing from the shipped
+union, so it needs a documented cast. `src/a11y/PaneHost.tsx` carries the only
+one; do not add more without verifying against the provider source.
+
 ### 2.3 What is missing, and what we do about it
 
 | Gap | Consequence | Mitigation |
@@ -76,7 +94,8 @@ reporting "item 7 of 240".
 | `UIA_LabeledByPropertyId` is not implemented, although `accessibilityLabelledBy` exists in the TypeScript surface | The prop silently does nothing. | **Never use `accessibilityLabelledBy`.** Compose the full string into `accessibilityLabel`. Enforced by lint rule. |
 | No LandmarkType or LocalizedLandmarkType | No landmark navigation between regions. | Provide our own region navigation: F6 pane cycling (section 3.4), with each pane given `role="pane"` and a spoken name. |
 | No `IWindowProvider`, no native menu bar | Dialogs are not natively modal and menus are not native menus. | Dialogs use `accessibilityViewIsModal` plus a manual focus trap. The menu bar is hand-built on the menubar, menu and menuitem control types with ExpandCollapse and Invoke. |
-| Aria props on Fabric are incomplete (upstream issue 11905, open) | `aria-*` aliases may not map. | Use the `accessibility*` props, never the `aria-*` aliases. Enforced by lint rule. |
+| UIA ItemStatus is hardcoded to `Busy` or empty, from `accessibilityState.busy` alone | No arbitrary per-item status text, so "syncing", "3 conflicts ahead" and similar cannot ride on the item itself. | Use `accessibilityState.busy` for the binary case, `accessibilityValue.text` where the control has a real value, and otherwise a live region. See 3.3. |
+| `accessibilityRole` and `role` resolve through two different native functions with different coverage | Neither prop is a superset. `accessibilityRole` handles `pane`, `tree` and `treeitem`, which `role` lacks; `role` reaches `status` (UIA StatusBar), `table` and `application`, which `accessibilityRole` lacks. An unmatched `accessibilityRole` silently degrades to a Group. | Pick per control against the table in 2.2a, and never assume the two are interchangeable. The remaining `aria-*` aliases are still incomplete (upstream issue 11905, open), so use `accessibility*` props for everything except the roles listed as role-only. |
 | "Advanced Screen Reader Readability", upstream issue 11901, still open | Parts of N-of-M, HelpText, Description and Value handling are still in flux. | Pin the RNW version. Every upgrade runs the screen reader regression suite (section 3.7) before merge. |
 
 ### 2.4 Honest risk statement
@@ -134,8 +153,19 @@ Three distinct slots, used consistently across the whole app:
 - `accessibilityHint` is what invoking the control does, and only appears when
   that is non-obvious.
 
-`accessibilityItemStatus` carries transient state such as "syncing" or "3
-conflicts". Never encode transient state in the label; it makes the label
+Transient state such as "syncing" or "3 conflicts" needs care, because the
+obvious slot is not available. UIA ItemStatus is **not** settable to arbitrary
+text on Fabric: the provider hardcodes it to the literal string `Busy` or empty,
+derived solely from `accessibilityState.busy`. There is no
+`accessibilityItemStatus` prop. So:
+
+- `accessibilityState.busy` for the binary in-progress case, which yields the
+  standard "Busy" announcement.
+- `accessibilityValue.text` for status text on a control that legitimately has a
+  value, since it reaches the Value pattern.
+- Otherwise a separate live region element (3.5), not the row's own label.
+
+Never encode transient state in `accessibilityLabel`; it makes the label
 unstable, and screen readers re-announce the whole label on every change.
 
 ### 3.4 Focus and navigation model
