@@ -1,7 +1,7 @@
 # GitApp Architecture and Accessibility Specification
 
 Status: draft 1, 2026-09-10
-Target stack: React Native Windows 0.84 (Fabric), Hermes, C++/WinRT native modules
+Target stack: .NET MAUI 10, C#, Windows first with Mac Catalyst for macOS
 
 This document is the reference for how GitApp is built and, more importantly, for
 the accessibility contract every screen must satisfy. It is written to be read
@@ -24,197 +24,156 @@ screen reader user with the keyboard alone**, and must feel like a Windows
 application rather than a website in a frame. Visual design borrows from
 github.com; interaction design borrows from Windows.
 
-Non-goals for v1: macOS and Linux, a built-in diff editor, Git hosting providers
-other than GitHub. The abstraction is designed for other hosts, but only GitHub
-ships in v1.
+macOS is a goal, via Mac Catalyst, and the stack was chosen for it. It is not
+a v1 ship target: Windows ships first and Catalyst is unverified on real
+hardware. Linux is out, and so is a built-in diff editor. Other Git hosts,
+GitLab and Codeberg, are a services-layer concern designed for from the start
+but shipping after GitHub.
 
 ## 2. Stack decision record
 
 ### 2.1 The decision
 
-React Native Windows 0.84 on the Fabric architecture. RNW 0.82 removed the
-legacy Paper renderer entirely, so Fabric is the only option and all research
-below targets it.
+.NET MAUI 10, C#, targeting Windows first and Mac Catalyst for macOS.
 
-Fabric does not render XAML controls. It composes visuals directly with Windows
-Composition and implements UI Automation itself, in
-`CompositionDynamicAutomationProvider`. Practically: **no control we render
-comes with accessibility attached.** Every announcement, pattern, and keyboard
-behaviour is something we assert explicitly in props. This is the central fact
-that shapes the rest of this document.
+The project began on React Native Windows and moved after two things became
+clear. First, macOS support and a single codebase became stated goals, and
+RNW could not meet them: `react-native-macos` was at 0.81.9 while RNW was at
+0.84, which are different React Native core versions, so one codebase could
+not target both. Second, and more important, a spike showed MAUI supplies the
+accessibility substrate that RNW Fabric requires an application to build for
+itself.
 
-### 2.2 What Fabric's UIA provider actually gives us
+The full measurements are in `docs/SPIKE-MAUI.md`. The short version:
 
-Verified by reading the provider source rather than the documentation, which
-lags. Source: `vnext/Microsoft.ReactNative/Fabric/Composition/`.
+- RNW Fabric composes visuals directly and implements UI Automation itself.
+  No control it renders carries accessibility; every role, pattern, set
+  position and keyboard behaviour is asserted by hand.
+- MAUI on Windows renders WinUI controls, which arrive with Microsoft's own
+  automation peers already correct.
 
-Patterns implemented: Invoke, Value, RangeValue, Toggle, ExpandCollapse,
-Selection, SelectionItem, Scroll, ScrollItem, Text, Annotation.
+Measured against a like-for-like shell, the same surface cost 1,547 lines of
+hand-written accessibility and theme code on RNW and 134 lines of XAML and
+code-behind on MAUI.
 
-Properties implemented: Name, FullDescription, HelpText, ControlType,
-AutomationId, AccessKey, HeadingLevel, Level, PositionInSet, SizeOfSet,
-ItemStatus, ItemType, LiveSetting, IsEnabled, IsKeyboardFocusable,
-HasKeyboardFocus, IsOffscreen, IsContentElement, IsControlElement.
+### 2.2 What MAUI supplies, verified
 
-Control types reachable through `accessibilityRole` and `role`: button, checkbox,
-combobox, hyperlink, image, list, listitem, menu, menubar, menuitem, progressbar,
-radio, scrollbar, spinbutton, splitbutton, tab, tablist, textinput, toolbar,
-**tree, treeitem**, pane, group, text, slider, separator, statusbar, header,
-document, window, custom.
+Read from a live UI Automation client against a running app, not from
+documentation.
 
-The presence of Tree and TreeItem control types, plus ExpandCollapse, Level,
-PositionInSet and SizeOfSet, means a correct screen-reader tree **is** buildable
-in RNW. It is not free, but it is not blocked either. The same applies to lists
-reporting "item 7 of 240".
+| Capability | Status |
+| --- | --- |
+| List and ListItem control types | Free from `CollectionView` |
+| `PositionInSet` / `SizeOfSet` | Free and correct, spoken as "1 of 4" |
+| `SelectionItem` pattern on rows | Free |
+| `Selection`, `Scroll`, `ItemContainer` on the list | Free |
+| Roving focus, single tab stop | Free |
+| Arrow keys, Home, End | Free |
+| Initial focus on the first item | Free |
+| Light, dark and high contrast themes | Free |
+| Focused control announced on window activation | Free |
 
-### 2.2a Which role prop to use
+`ItemContainer` deserves a specific mention: Fabric does not implement it at
+all, and it is the pattern that lets a screen reader reach items virtualized
+out of view. On RNW that was a documented gap with only a partial workaround.
 
-`accessibilityRole` and `role` are not aliases. They resolve through two
-separate native functions, `GetControlTypeFromString` and
-`GetControlTypeFromRole` respectively, and neither covers everything. Choosing
-the wrong one degrades silently to a Group with no warning at build or run time.
+### 2.3 What is still ours to build
 
-- Use **`accessibilityRole`** for: `pane`, `tree`, `treeitem`, `keyboardkey`,
-  `splitbutton`, `toolbar`, `menubar`, `list`, `listitem`, and the ordinary
-  control roles.
-- Use **`role`** for: `status` (the only route to UIA StatusBar), `table`,
-  `application`, `document`, `separator`, `columnheader`, `rowheader`.
-
-The TypeScript surface lags the native mapping in at least one place:
-`accessibilityRole="pane"` is accepted natively but missing from the shipped
-union, so it needs a documented cast. `src/a11y/PaneHost.tsx` carries the only
-one; do not add more without verifying against the provider source.
-
-### 2.3 What is missing, and what we do about it
-
-| Gap | Consequence | Mitigation |
+| Gap | Why | Where |
 | --- | --- | --- |
-| No `IGridProvider`, `ITableProvider` or `IGridItemProvider` | `role="table"` sets a control type but screen readers get no row and column navigation. Commit lists and file tables cannot be real grids. | Model tabular data as a list of rows whose accessible name concatenates the columns, with column headers carried in `accessibilityDescription`. Where a true grid is required, use a XAML island (section 3.6). |
-| No `IItemContainerProvider` or `IVirtualizedItemProvider` | Screen readers cannot reach items scrolled out of a virtualized list. | Set `accessibilityPosInSet` and `accessibilitySetSize` from the full dataset length, not the rendered window, so counts are honest. Keep virtualization windows generous and page explicitly rather than scrolling infinitely. |
-| `UIA_LabeledByPropertyId` is not implemented, although `accessibilityLabelledBy` exists in the TypeScript surface | The prop silently does nothing. | **Never use `accessibilityLabelledBy`.** Compose the full string into `accessibilityLabel`. Enforced by lint rule. |
-| No LandmarkType or LocalizedLandmarkType | No landmark navigation between regions. | Provide our own region navigation: F6 pane cycling (section 3.4), with each pane given `role="pane"` and a spoken name. |
-| No `IWindowProvider`, no native menu bar | Dialogs are not natively modal and menus are not native menus. | Dialogs use `accessibilityViewIsModal` plus a manual focus trap. The menu bar is hand-built on the menubar, menu and menuitem control types with ExpandCollapse and Invoke. |
-| UIA ItemStatus is hardcoded to `Busy` or empty, from `accessibilityState.busy` alone | No arbitrary per-item status text, so "syncing", "3 conflicts ahead" and similar cannot ride on the item itself. | Use `accessibilityState.busy` for the binary case, `accessibilityValue.text` where the control has a real value, and otherwise a live region. See 3.3. |
-| `accessibilityRole` and `role` resolve through two different native functions with different coverage | Neither prop is a superset. `accessibilityRole` handles `pane`, `tree` and `treeitem`, which `role` lacks; `role` reaches `status` (UIA StatusBar), `table` and `application`, which `accessibilityRole` lacks. An unmatched `accessibilityRole` silently degrades to a Group. | Pick per control against the table in 2.2a, and never assume the two are interchangeable. The remaining `aria-*` aliases are still incomplete (upstream issue 11905, open), so use `accessibility*` props for everything except the roles listed as role-only. |
-| WinUI Fluent brush names resolve to hardcoded light-theme values (upstream issue 11489) | `PlatformColor('TextFillColorPrimary')` and the rest of the Fluent palette return light colours in every theme, so the obvious modern choice fails in dark mode exactly like a hex literal. | Use only the `UIColorType` and `UIElementType` names, which are theme and high-contrast aware. See 3.8. A custom resource loader is the eventual route to real Fluent colours. |
-| "Advanced Screen Reader Readability", upstream issue 11901, still open | Parts of N-of-M, HelpText, Description and Value handling are still in flux. | Pin the RNW version. Every upgrade runs the screen reader regression suite (section 3.7) before merge. |
+| F6 region navigation | Neither MAUI nor Windows has a landmark concept; F6 is a convention, not a feature | `Accessibility/PaneNavigation.cs` plus a Windows key hook |
+| Announcement policy | `SemanticScreenReader.Announce` is plumbing with no rate limiting, coalescing or start/finish pairing | `Accessibility/Announcer.cs` |
+| Focus restoration | Nothing remembers where focus should return to when a menu or dialog closes | `Accessibility/FocusManager.cs` |
+| Focusing a list from outside | `CollectionView.Focus()` lands on the scroll host, which reports as an unnamed Pane and says nothing useful | `Platforms/Windows/PlatformFocus.Windows.cs` |
+| Remembering the focused row | A row is a platform item container, not a `VisualElement`, so a pane cannot hold a reference to it | `PlatformFocus.TrackFocusWithin` |
 
-### 2.3a The window activation announcement is gone on Fabric
-
-Legacy RNW apps announce themselves to a screen reader the way Settings and
-the Store do. Fabric apps do not. This was measured, not inferred, by running
-three apps side by side with NVDA's Speech Viewer and reading the transcript
-out of its edit control.
-
-| App | Architecture | Win32 class | NVDA on activation |
-| --- | --- | --- | --- |
-| React Native Gallery (Legacy) | Paper, UWP | `ApplicationFrameWindow`, hosted by ApplicationFrameHost | "React Native Gallery (Legacy)" / "React Native Gallery (Legacy) **window**" / "Navigation bar **button**" |
-| React Native Gallery | Fabric, Win32 | `Microsoft.UI.Windowing.Window` | "React Native Gallery" |
-| GitApp | Fabric, Win32 | `Microsoft.UI.Windowing.Window` | "GitApp" |
-
-Two things are lost, and the second matters far more than the first:
-
-1. The word "window" after the title.
-2. **The focused control is not announced at all.** The legacy app names the
-   control focus landed on; the Fabric apps name only the window.
-
-The cause is the window itself. A legacy RNW app was a UWP app, so its window
-was an `ApplicationFrameWindow` owned by ApplicationFrameHost, which NVDA has
-long-standing handling for. A Fabric app is a plain Win32 app whose window is
-`Microsoft.UI.Windowing.Window`. Every other property is identical between the
-two Fabric apps and ours: same class, same style `0x15CF0000`, same exstyle,
-same UIA `ControlType.Window`, same `LocalizedControlType` of "window", same
-`FrameworkId`. There is nothing to fix in our code, and nothing distinguishes
-GitApp from Microsoft's own current sample.
-
-This is not a general failure of screen reader support. Once focus is inside
-the app, NVDA reads our tree correctly: tabbing to a button announces
-"Fetch button, Downloads new commits without changing your working tree, F",
-which is the label, the hint and the access key. Only the activation moment is
-affected.
-
-Options, in order of preference:
-
-- **Report it upstream.** No matching issue exists on
-  microsoft/react-native-windows. It affects every Fabric app, including
-  Microsoft's own, so it is worth filing with the evidence above.
-- **Work around the second symptom.** Re-asserting focus when the window is
-  activated fires a UIA focus change, which NVDA does announce. That needs a
-  native window-activation event surfaced to JS, since RNW's AppState only
-  reports deactivation behind a quirk setting inherited from the UWP era.
-  `FocusManager` already tracks the target to restore.
-- **Accept the first symptom.** The missing word "window" follows from the
-  window class, and short of shipping as a UWP app there is nothing to change.
+Every one of these was found by running the app and reading the automation
+tree, not by reasoning about the API surface. That remains the working
+method; see section 3.7.
 
 ### 2.4 Honest risk statement
 
-RNW gives us a competent UIA substrate and a real escape hatch, but a large
-share of this project's effort is accessibility infrastructure that WPF or
-wxPython would have supplied for free. The mitigation is to build that
-infrastructure once, as described in section 3, and then forbid feature screens
-from doing accessibility by hand.
+Two risks are live.
+
+**Mac Catalyst is untested.** Everything measured so far is Windows. Catalyst
+is an iOS UI running on macOS and VoiceOver treats it accordingly; native
+macOS remains an upstream discussion rather than a shipping target. Nothing
+should be promised about macOS until a Catalyst spike runs on real hardware.
+
+**MAUI has open accessibility issues**, around 30 under the `t/a11y` label.
+The composition is reassuring rather than alarming, since many are
+Microsoft's own conformance passes filing their findings and closures land
+steadily, but the count is not zero and `CollectionView` keyboard navigation
+was among them until this project measured it working.
 
 ## 3. Accessibility architecture
 
 ### 3.1 The rule
 
-Feature screens never set raw accessibility props. They compose primitives from
-`src/a11y/` that have the correct UIA semantics baked in and tested. A screen
-that reaches for `accessibilityRole` directly is a bug, caught by lint.
+Feature screens use framework controls directly and lean on what MAUI already
+gets right. They do not hand-roll accessibility semantics.
 
-This is the only way the contract survives contact with feature work.
+This is a change of emphasis from the React Native design, where the rule was
+that screens must never touch accessibility props, because a shared primitive
+layer owned every role and pattern. That layer existed because Fabric supplied
+nothing. MAUI supplies most of it, so an equivalent wrapper would be ceremony
+that hides working behaviour behind our own bugs.
 
-### 3.2 Primitive layer
+What screens still must not do:
 
-`src/a11y/primitives/` exports, at minimum:
+- Write a literal colour. Use `AppThemeBinding` or a system brush, so light,
+  dark and high contrast all keep working (3.8).
+- Invent their own region structure. Wrap content in `Pane` (3.4).
+- Announce directly through `SemanticScreenReader`. Go through `Announcer`,
+  which owns the rate limiting (3.5).
+- Split a row's content into separate accessible children. Give the row one
+  name, in reading order (3.3).
 
-- `Button`, `ToggleButton`, `SplitButton`, `Link`
-- `TextField`, `SearchField`, `ComboBox`, `Checkbox`, `RadioGroup`
-- `List` and `ListRow`. Owns roving tabindex, type-to-select, PositionInSet and
-  SizeOfSet from the total count, Home, End, Page Up, Page Down, and the
-  Applications key opening the row context menu.
-- `Tree` and `TreeNode`. Adds Level, ExpandCollapse, Left and Right arrow to
-  collapse and expand, and asterisk to expand all siblings.
-- `Tabs` and `Tab`. Tablist and tab control types, Ctrl+Tab and Ctrl+Shift+Tab,
-  arrow keys within the strip.
-- `MenuBar`, `Menu`, `MenuItem`. Alt to enter, mnemonics via
-  `accessibilityAccessKey`, arrow navigation, Escape to leave with focus
-  restored to the point of origin.
-- `Dialog`. Focus trap, initial focus, `accessibilityViewIsModal`, Escape, and
-  focus restoration on close.
-- `Announcer`. The live region service, section 3.5.
+### 3.2 What replaced the primitive layer
 
-Each primitive ships with a UIA tree snapshot test (section 3.7). The snapshot
-is the contract.
+`src/GitApp/Accessibility/` is four small pieces rather than a control
+library:
+
+- `Announcer` - announcement policy: throttling, coalescing, dropped repeats,
+  and the start/finish pairing for long operations.
+- `FocusManager` - the pane registry and the focus restore stack.
+- `Pane` and `PaneNavigation` - regions and F6 cycling.
+- `PlatformFocus` - the two things focus cannot do portably: focusing into a
+  list, and remembering which row was focused.
+
+Everything else that used to live there (roving tabindex, arrow keys, set
+positions, selection state, initial focus, theming) is supplied by the
+framework and verified in `docs/SPIKE-MAUI.md`.
 
 ### 3.3 Naming and description contract
 
 Three distinct slots, used consistently across the whole app:
 
-- `accessibilityLabel` is the identity of the control. Short, front-loaded with
-  the distinguishing word, and never containing the control type, since the
-  control type is already announced. For a list row, the full row content as one
-  string, in reading order, comma-separated.
-- `accessibilityDescription` is supplementary context a user may want but does
-  not need every time. It maps to FullDescription. Column headers for a row,
-  relative timestamps, CI status detail.
-- `accessibilityHint` is what invoking the control does, and only appears when
-  that is non-obvious.
+- `SemanticProperties.Description` is the identity of the control. Short,
+  front-loaded with the distinguishing word, and never containing the control
+  type, since the control type is already announced. For a list row, the full
+  row content as one string, in reading order, comma-separated. Note the name:
+  on Windows this becomes the UIA *Name*, not FullDescription, which is the
+  opposite of what the property name suggests.
+- `SemanticProperties.Hint` is what invoking the control does, and only
+  appears when that is non-obvious.
+- `SemanticProperties.HeadingLevel` marks headings so a screen reader can jump
+  between them.
 
-Transient state such as "syncing" or "3 conflicts" needs care, because the
-obvious slot is not available. UIA ItemStatus is **not** settable to arbitrary
-text on Fabric: the provider hardcodes it to the literal string `Busy` or empty,
-derived solely from `accessibilityState.busy`. There is no
-`accessibilityItemStatus` prop. So:
+`AutomationProperties.Name` is obsolete in MAUI 10 and the compiler says so.
+Do not reach for it.
 
-- `accessibilityState.busy` for the binary in-progress case, which yields the
-  standard "Busy" announcement.
-- `accessibilityValue.text` for status text on a control that legitimately has a
-  value, since it reaches the Value pattern.
-- Otherwise a separate live region element (3.5), not the row's own label.
+Transient state such as "syncing" or "3 conflicts" goes in one of two places:
 
-Never encode transient state in `accessibilityLabel`; it makes the label
-unstable, and screen readers re-announce the whole label on every change.
+- The status line (3.5), for anything about the operation in progress.
+- A separate, individually named element in the row, for state that belongs
+  to the item and persists.
+
+Never fold transient state into the row's own name. The name becomes unstable,
+and a screen reader re-announces the whole row every time the state ticks.
+This rule cost real effort to discover on the previous stack, where the
+obvious slot for it, UIA ItemStatus, turned out to be hardcoded and unusable.
+The rule outlived the framework.
 
 ### 3.4 Focus and navigation model
 
@@ -269,23 +228,23 @@ report meaningful milestones rather than every percent; and every long-running
 Git operation announces both start and completion, because silence reads as a
 hang.
 
-### 3.6 The XAML island escape hatch
+### 3.6 Dropping to the platform
 
-`ContentIslandComponentView` lets us host a real WinUI control inside the Fabric
-tree, and the Fabric UIA provider delegates through `ChildSiteLink` to the hosted
-framework's own automation provider. A hosted WinUI control therefore brings its
-complete, Microsoft-tested accessibility with it.
+The React Native design needed an escape hatch, XAML islands, for semantics
+Fabric could not express. On MAUI the framework already renders WinUI, so the
+equivalent is a handler customisation or a small file under `Platforms/`.
 
-This is expensive, costing a C++/WinRT component per island plus a styling seam,
-so it is reserved for cases where Fabric genuinely cannot express the semantics:
+Two exist so far, both under `Platforms/Windows/`:
 
-- A real data grid, if commit or file tables prove unusable as lists.
-- The rich text editor for comment composition, if we need Text pattern support
-  beyond what Fabric's `ITextProvider2` offers.
+- `PaneNavigation.Windows.cs` hooks F6, because MAUI has no cross-platform way
+  to observe a keystroke that no control has claimed.
+- `PlatformFocus.Windows.cs` focuses into a list, and remembers which row had
+  focus.
 
-Decide case by case, and only after a screen reader test has proven the Fabric
-version inadequate. Do not reach for islands by default; a codebase half in each
-is worse than either one.
+The rule for adding a third: prove the portable API cannot do it, and write
+down what you observed. Both files above carry that reasoning inline, because
+in both cases the obvious portable call appears to succeed while doing the
+wrong thing.
 
 ### 3.7 Verification
 
@@ -318,93 +277,48 @@ CI gates on items 1 and 3. Items 2 and 4 gate the release.
 
 ### 3.8 Theming, dark mode and high contrast
 
-Colour is an accessibility concern here, not a cosmetic one, and Fabric has a
-trap in it that is worth stating precisely.
+MAUI follows the system light, dark and high contrast themes on its own,
+verified by running the app while toggling the OS setting.
 
-RNW 0.84 made `Text` colour theme-aware by default. Any hardcoded background
-therefore breaks in the opposite theme: a white background plus a theme-aware
-foreground is white-on-white in dark mode, which renders as a blank window with
-no error anywhere. That is not a hypothetical; it is how the first shell
-shipped.
+This was a significant piece of hand-written machinery on React Native. Under
+Fabric no `PlatformColor` name returned dark-theme values: the WinUI Fluent
+names were aliased to a hardcoded light table, and the classic `UIElementType`
+names tracked high contrast but not light and dark. Three palettes and a
+selection hook existed to work around that. None of it is needed here.
 
-**Every colour in the app is a `PlatformColor` from `src/theme`. No hex
-literals.** A test enforces this (`tests/a11y/noHardcodedColors.test.ts`),
-because the failure is invisible in whichever theme the developer happens to be
-using.
+The single rule that survives, and the reason that machinery existed:
+**never write a literal colour in a view.** Under MAUI that means
+`AppThemeBinding` or a system brush. A hex literal cannot respond to a theme,
+and the failure is invisible to whichever developer is not using the theme
+that breaks.
 
-Which platform colour names are safe is the non-obvious part. Fabric's
-`Theme::TryGetPlatformColor` resolves in four tiers:
-
-1. An app-registered custom resource loader.
-2. `UISettings.GetColorValue(UIColorType)` — theme aware. `Accent`,
-   `Background`, `Foreground`.
-3. `UISettings.UIElementColor(UIElementType)` — theme aware **and high
-   contrast aware**, because the system returns the active HC palette.
-   `Window`, `WindowText`, `ButtonFace`, `ButtonText`, `Highlight`,
-   `HighlightText`, `GrayText`, `Hotlight`, and the rest of the classic set.
-4. WinUI Fluent brush names, aliased to a table of **hardcoded light-theme
-   values** (upstream issue 11489).
-
-Tier 4 is the trap, and it is the tier that looks correct.
-`TextFillColorPrimary`, `ControlFillColorDefault` and `SolidBackgroundFillColorBase`
-are exactly what a WinUI XAML app would use, and under Fabric they return light
-values in every theme.
-
-The conclusion, verified by running the app rather than by reading the table:
-**no `PlatformColor` name returns dark-theme values.** Tier 4 is hardcoded
-light, and the tier 3 `UIElementType` names are the classic Win32 system
-colours, which track high contrast but not the Windows 11 light/dark setting.
-An app built entirely on platform colours is therefore permanently light.
-
-So GitApp uses three palettes, selected by `useTheme()`:
-
-- **High contrast** is entirely tier 2 and 3 platform colours. Under a high
-  contrast theme the user has chosen those colours and the app must obey them.
-  This palette takes priority over everything, including an explicit light or
-  dark preference.
-- **Light** and **dark** are Fluent's own values, written out in
-  `src/theme/palette.ts` and selected with `useColorScheme()`. That file is the
-  one place in the app allowed to name a colour, and a test enforces it.
-- The accent is `PlatformColor('Accent')` in all three, since tier 2 resolves
-  it correctly in every theme.
-
-Selection always uses a pair, `selected` with `selectedText`. High contrast
-redefines both, and using one with a colour of our own produces unreadable
-rows.
-
-The native title bar is separate from all of this: it is drawn by DWM, not by
-Fabric, so it needs `DWMWA_USE_IMMERSIVE_DARK_MODE` set on the window handle at
-startup. Without it a dark app keeps a light title bar, which is the most
-visible way a Windows app looks unfinished. `windows/gitapp/gitapp.cpp` does
-this from the same UISettings signal the JS theme uses, so the two cannot
-disagree.
-
-Replacing the literals with real Fluent resources means registering a custom
-resource loader natively, at tier 1. That is a reasonable later project and is
-not worth blocking feature work on.
+`src/GitApp/Theme/Tokens.cs` holds spacing, radii, type sizes and control
+metrics. It deliberately holds no colours.
 
 ## 4. System architecture
 
 ### 4.1 Layers
 
-JavaScript, running on Hermes:
+One C# project, `src/GitApp/`:
 
-- `screens/` — feature UI, composed only from accessibility primitives.
-- `a11y/` — primitives, FocusManager, Announcer, keymap registry.
-- `domain/` — provider-agnostic models: Repo, Commit, PullRequest, and so on.
-- `services/` — GitHubClient, GitService, NotificationService, AuthService.
-- `state/` — Zustand stores and the TanStack Query cache.
+- `Views/` and the page files - feature UI in XAML.
+- `Accessibility/` - Announcer, FocusManager, Pane, PaneNavigation, PlatformFocus.
+- `Theme/` - spacing, type and metric tokens. No colours.
+- `Domain/` - provider-agnostic models: Repo, Commit, PullRequest, and so on.
+- `Services/` - GitHubClient, GitService, NotificationService, AuthService.
+- `ViewModels/` - per-screen state.
+- `Platforms/` - the small amount that cannot be portable.
 
-Native, as C++/WinRT turbo modules:
+Being an ordinary desktop .NET process matters for more than tidiness.
+Launching `git.exe` and reading repositories from arbitrary paths both need an
+unsandboxed process, which is exactly what the UWP app model would have
+forbidden.
 
-- `GitModule` — hosts the git.exe process.
-- `CredentialModule` — Windows Credential Manager.
-- `ToastModule` — Windows App SDK app notifications.
-- `ShellModule` — file pickers, Explorer integration, protocol handler.
-
-The `domain/` layer exists so that GitLab and Codeberg can later be added as
-additional `services/` implementations behind the same models. Screens never
-import a provider client directly.
+The `Domain/` layer exists so that GitLab and Codeberg can later be added as
+additional `Services/` implementations behind the same models. Screens never
+reference a provider client directly. That separation is also what makes the
+UI framework replaceable: when the shell moved from React Native to MAUI,
+nothing below the view layer would have needed to change, had it existed yet.
 
 ### 4.2 Git engine: bundled git.exe, not libgit2
 
@@ -421,11 +335,15 @@ Three options were considered.
   helpers, worktrees, everything the user's own Git does. This is the approach
   GitHub Desktop takes, through dugite.
 
-We take the third. `GitModule` is a thin C++/WinRT turbo module that spawns
-git.exe, streams stdout and stderr, and reports exit codes. All parsing lives in
-TypeScript, in `services/GitService`.
+We take the third. `Services/GitProcess` is a thin wrapper over
+`System.Diagnostics.Process` that spawns git.exe, streams stdout and stderr,
+and reports exit codes. All parsing lives above it, in `Services/GitService`.
 
-Rules for that module:
+This is markedly simpler than it was going to be: the previous stack needed a
+C++/WinRT native module and a JavaScript bridge to reach the same place. A
+normal .NET process can just start a process.
+
+Rules for that wrapper:
 
 - Parse `--porcelain=v2` with `-z` NUL-delimited output. Never parse
   human-readable Git output; it is localized and unstable.
@@ -479,31 +397,32 @@ ships with a sparse package, a decision that also constrains installer design.
 
 ### 4.6 State management
 
-Zustand for app state, TanStack Query for the server cache. Redux was rejected as
-ceremony this project does not need.
+MVVM with `CommunityToolkit.Mvvm`, and `ObservableCollection` for lists that
+change under a bound control.
 
-The accessibility-driven constraint on state is that **re-renders must not move
-focus or re-announce unchanged content.** In practice that means stable list item
-keys derived from server IDs, selectors narrow enough that a background refresh
-does not re-render a focused row, and optimistic updates that never reorder a
-list underneath the user's cursor.
+The accessibility-driven constraint is unchanged by the port: **updates must
+not move focus or re-announce unchanged content.** In practice that means
+mutating an existing `ObservableCollection` rather than replacing it, since a
+wholesale replacement rebuilds every container and throws away both the focus
+position and the screen reader's sense of place; raising `PropertyChanged`
+only for properties that actually changed; and never reordering a list
+underneath the user's cursor as the result of a background refresh.
 
 ## 5. Repository layout
 
-- `src/a11y/` — primitives, FocusManager, Announcer, keymap.
-- `src/screens/` — one directory per screen, each with its accessibility checklist.
-- `src/domain/` — provider-agnostic models.
-- `src/services/` — GitHubClient, GitService, NotificationService, AuthService.
-- `src/state/` — stores and query definitions.
-- `src/theme/` — design tokens derived from github.com, for light, dark and high contrast.
-- `windows/` — C++/WinRT native modules and the RNW app project.
-- `docs/` — this file and its successors.
-- `tests/a11y/` — prop-level accessibility snapshots, the theme-discipline
-  check, and keyboard reachability tests.
-- `tests/services/` — Git porcelain parsing fixtures and API contract tests.
+- `GitApp.slnx` - the solution.
+- `src/GitApp/` - the MAUI application.
+  - `Accessibility/` - Announcer, FocusManager, Pane, PaneNavigation, PlatformFocus.
+  - `Domain/` - provider-agnostic models.
+  - `Services/` - GitHubClient, GitService, NotificationService, AuthService.
+  - `Theme/` - spacing, type and metric tokens.
+  - `Platforms/Windows/` - the F6 key hook and the focus helpers.
+  - `Platforms/MacCatalyst/` - the macOS equivalents, once Catalyst is verified.
+- `docs/` - this specification, the MAUI spike, and the developer notes.
+- `tests/` - to be re-established; see 3.7.
 
-High contrast is a first-class theme rather than an afterthought: it is one of
-the `theme/` targets and it appears in the visual review checklist.
+High contrast is a first-class theme rather than an afterthought. MAUI
+supplies it, and the theme rule in 3.8 is what keeps it working.
 
 ## 6. Milestones
 

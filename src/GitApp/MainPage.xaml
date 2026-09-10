@@ -1,0 +1,104 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             x:Class="GitApp.MainPage"
+             Title="GitApp">
+
+    <!--
+      Milestone 1 shell.
+
+      Exists to prove the accessibility substrate before any feature depends
+      on it: panes cycled with F6, a list with honest set positions, a status
+      live region, and announcements. The data is placeholder. The interaction
+      model is not.
+
+      No literal colours anywhere. MAUI follows the system light, dark and
+      high contrast themes on its own; see src/GitApp/Theme/Tokens.cs.
+    -->
+
+    <Grid RowDefinitions="*,Auto" ColumnDefinitions="280,*">
+
+        <a11y:Pane x:Name="ReposPane"
+                   Grid.Row="0" Grid.Column="0"
+                   PaneId="repos"
+                   PaneName="Repositories"
+                   PaneOrder="10">
+            <VerticalStackLayout Padding="8">
+                <Label Text="Repositories"
+                       FontSize="12"
+                       Opacity="0.7"
+                       Margin="4,0,0,4"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView x:Name="RepoList"
+                                ItemsSource="{Binding Repos}"
+                                SelectionMode="Single"
+                                SelectionChanged="OnRepoSelected"
+                                SemanticProperties.Description="Repositories">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate>
+                            <!--
+                              One accessible name for the whole row, in reading
+                              order. CollectionView supplies the list and item
+                              roles, the set positions and the selection
+                              pattern; we only supply the name.
+                            -->
+                            <VerticalStackLayout Padding="8,4"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Name}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </VerticalStackLayout>
+        </a11y:Pane>
+
+        <a11y:Pane x:Name="DetailPane"
+                   Grid.Row="0" Grid.Column="1"
+                   PaneId="detail"
+                   PaneName="Repository details"
+                   PaneOrder="20">
+            <VerticalStackLayout Padding="24" Spacing="4">
+                <Label x:Name="TitleLabel"
+                       Text="gitapp"
+                       FontSize="28"
+                       SemanticProperties.HeadingLevel="Level1" />
+
+                <Label x:Name="SubtitleLabel"
+                       Text="On branch main, 2 ahead"
+                       FontSize="14"
+                       Opacity="0.7"
+                       Margin="0,0,0,16" />
+
+                <HorizontalStackLayout Spacing="8">
+                    <Button x:Name="FetchButton"
+                            Text="Fetch"
+                            MinimumHeightRequest="32"
+                            Clicked="OnFetch"
+                            SemanticProperties.Hint="Downloads new commits without changing your working tree" />
+                    <Button Text="Pull"
+                            MinimumHeightRequest="32"
+                            Clicked="OnNotImplemented" />
+                    <Button Text="Push"
+                            MinimumHeightRequest="32"
+                            Clicked="OnNotImplemented" />
+                </HorizontalStackLayout>
+            </VerticalStackLayout>
+        </a11y:Pane>
+
+        <!--
+          The application status line. One live region for the whole app:
+          multiple simultaneous regions race each other in the speech queue
+          and the user hears fragments. See docs/ARCHITECTURE.md section 3.5.
+        -->
+        <Label x:Name="StatusLabel"
+               Grid.Row="1" Grid.ColumnSpan="2"
+               Padding="12,4"
+               FontSize="14"
+               Opacity="0.7"
+               Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>
