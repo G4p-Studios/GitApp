@@ -19,6 +19,9 @@ public sealed class MainViewModel : ObservableObject
     private bool _isMerging;
     private string _oursLabel = "this branch";
     private string _theirsLabel = "the other branch";
+    private FileChange? _selectedChange;
+    private bool _selectedChangeIsStaged;
+    private string _diffSummary = "No file selected";
 
     public MainViewModel(GitService? git = null, RepositoryStore? store = null, Announcer? announcer = null)
     {
@@ -57,6 +60,58 @@ public sealed class MainViewModel : ObservableObject
     public ObservableCollection<BranchInfo> Branches { get; } = new();
 
     public ObservableCollection<FileChange> Conflicts { get; } = new();
+
+    public ObservableCollection<DiffRow> DiffRows { get; } = new();
+
+    /// <summary>
+    /// Spoken when a diff loads, so the listener knows the size of what they
+    /// are about to move through before they start.
+    /// </summary>
+    public string DiffSummary
+    {
+        get => _diffSummary;
+        private set => Set(ref _diffSummary, value);
+    }
+
+    /// <summary>
+    /// The file whose diff is showing. Set from whichever of the three
+    /// change lists the user picked in; the flag records which, because
+    /// staged and unstaged are genuinely different diffs and showing the
+    /// wrong one is how someone commits something they did not mean to.
+    /// </summary>
+    public FileChange? SelectedUnstagedChange
+    {
+        get => _selectedChangeIsStaged ? null : _selectedChange;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            _selectedChangeIsStaged = false;
+            _selectedChange = value;
+            Raise(nameof(SelectedUnstagedChange));
+            _ = LoadDiffAsync();
+        }
+    }
+
+    public FileChange? SelectedStagedChange
+    {
+        get => _selectedChangeIsStaged ? _selectedChange : null;
+        set
+        {
+            if (value is null)
+            {
+                return;
+            }
+
+            _selectedChangeIsStaged = true;
+            _selectedChange = value;
+            Raise(nameof(SelectedStagedChange));
+            _ = LoadDiffAsync();
+        }
+    }
 
     /// <summary>
     /// Bound to the branch picker. Setting it switches branches, so the
@@ -190,6 +245,13 @@ public sealed class MainViewModel : ObservableObject
     {
         await _store.LoadAsync();
 
+        if (_store.LoadError is { } problem)
+        {
+            // Assertive: the user is about to wonder where everything went.
+            _announcer.Announce(problem, Urgency.Assertive);
+            _announcer.SetStatus(problem);
+        }
+
         foreach (var path in _store.Paths)
         {
             Repositories.Add(new RepositoryItem(path));
@@ -264,7 +326,10 @@ public sealed class MainViewModel : ObservableObject
         {
             Staged.Clear();
             Unstaged.Clear();
+            Conflicts.Clear();
             Commits.Clear();
+            DiffRows.Clear();
+            DiffSummary = "No file selected";
             return;
         }
 
@@ -441,6 +506,64 @@ public sealed class MainViewModel : ObservableObject
             result => result.Success
                 ? $"Pushed {branch}"
                 : $"Push failed: {result.ErrorMessage}");
+    }
+
+    /// <summary>
+    /// Load the diff for the selected file.
+    ///
+    /// The summary is announced rather than only displayed: the size of a
+    /// diff is what a sighted reader gets from the scrollbar before they
+    /// start reading, and there is no equivalent in speech unless it is
+    /// said.
+    /// </summary>
+    private async Task LoadDiffAsync()
+    {
+        if (SelectedRepository is not { } repo || _selectedChange is null)
+        {
+            DiffRows.Clear();
+            DiffSummary = "No file selected";
+            return;
+        }
+
+        var change = _selectedChange;
+
+        var diff = await _git.GetDiffAsync(repo.Path, change.Path, _selectedChangeIsStaged);
+
+        Replace(DiffRows, DiffRow.From(diff));
+
+        var side = _selectedChangeIsStaged ? "staged" : "unstaged";
+        DiffSummary = diff.HasChanges
+            ? $"{diff.Summary}, {side}"
+            : $"{change.FileName}, no {side} changes to show";
+
+        _announcer.Announce(DiffSummary);
+    }
+
+    /// <summary>
+    /// The index of the next or previous hunk header, from
+    /// <paramref name="fromIndex"/>. Returns -1 when there is none, so the
+    /// caller can say so rather than moving silently to nowhere.
+    /// </summary>
+    public int FindHunkRow(int fromIndex, int direction)
+    {
+        if (DiffRows.Count == 0)
+        {
+            return -1;
+        }
+
+        var i = fromIndex + direction;
+
+        while (i >= 0 && i < DiffRows.Count)
+        {
+            if (DiffRows[i].IsHeader)
+            {
+                return i;
+            }
+
+            i += direction;
+        }
+
+        return -1;
     }
 
     private async Task CloneAsync()

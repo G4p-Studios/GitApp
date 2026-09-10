@@ -255,6 +255,71 @@ public sealed partial class GitService
             ours.Success && ours.StdOut.Trim().Length > 0 ? ours.StdOut.Trim() : "this branch",
             theirs.Success && theirs.StdOut.Trim().Length > 0 ? theirs.StdOut.Trim() : "the other branch");
     }
+
+    // -----------------------------------------------------------------
+    // Diffs
+    // -----------------------------------------------------------------
+
+    /// <summary>
+    /// The diff for one path.
+    /// </summary>
+    /// <param name="staged">
+    /// True for what is staged (index against HEAD), false for what is not
+    /// (working tree against index). The distinction matters: those are
+    /// different diffs, and showing one while the user is looking at the
+    /// other is how someone commits something they did not mean to.
+    /// </param>
+    public async Task<FileDiff> GetDiffAsync(
+        string repoPath,
+        string path,
+        bool staged,
+        int contextLines = 3,
+        CancellationToken ct = default)
+    {
+        var args = new List<string> { "diff" };
+
+        if (staged)
+        {
+            args.Add("--cached");
+        }
+
+        args.Add($"--unified={contextLines}");
+
+        // No colour and no external tool: we are parsing this, not showing
+        // it. A user with diff.external configured would otherwise get
+        // something unparseable.
+        args.Add("--no-color");
+        args.Add("--no-ext-diff");
+        args.Add("--");
+        args.Add(path);
+
+        var result = await _git.RunRawAsync(repoPath, args, ct);
+
+        if (!result.Success)
+        {
+            return FileDiff.Empty with { Path = path };
+        }
+
+        // An untracked file has nothing to diff against, so git returns
+        // nothing at all. Compare it against the empty tree instead, so the
+        // user sees its contents as added rather than an empty panel.
+        if (string.IsNullOrWhiteSpace(result.StdOut) && !staged)
+        {
+            var untracked = await _git.RunRawAsync(
+                repoPath,
+                new[] { "diff", "--no-index", "--no-color", "--no-ext-diff", $"--unified={contextLines}", "/dev/null", path },
+                ct);
+
+            // --no-index exits 1 when files differ, which is the normal case
+            // here rather than a failure.
+            if (!string.IsNullOrWhiteSpace(untracked.StdOut))
+            {
+                return UnifiedDiffParser.Parse(untracked.StdOut, path);
+            }
+        }
+
+        return UnifiedDiffParser.Parse(result.StdOut, path);
+    }
 }
 
 public enum ConflictSide

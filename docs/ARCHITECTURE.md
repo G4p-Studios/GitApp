@@ -435,9 +435,9 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
 
 1. **Foundations.** Done. App shell, F6 pane model, FocusManager, Announcer,
    and the platform focus helpers.
-2. **Local repositories.** Done except diffs. Add, remove and clone
-   repositories, status, stage, unstage, commit, fetch, pull, push, history,
-   branch switching and creation, and conflict resolution, all against real
+2. **Local repositories.** Done. Add, remove and clone repositories, status,
+   stage, unstage, commit, fetch, pull, push, history, branch switching and
+   creation, conflict resolution, and the diff viewer, all against real
    repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code view.
 4. **GitHub write.** Comment, review, merge, release management.
@@ -459,10 +459,9 @@ to people who use git daily, and worse heard than read: during a merge
 - **Mac Catalyst is entirely unverified.** No Apple hardware is available to
   this project. F6 has no implementation there and is the wrong gesture for
   macOS regardless; region navigation will need a VoiceOver-native answer.
-- **Diff presentation for screen readers is unsolved** in every Git client,
-  FastGH and GitHub Desktop included. It deserves its own design document
-  rather than a paragraph here, and it is the single hardest remaining
-  problem in the app.
+- **Diff presentation** has a first implementation and its own design
+  document, `docs/DIFF-VIEWER.md`. The remaining questions there are real:
+  intra-line changes, very large hunks, and how much context to read.
 - **Large repositories are untested.** Status parsing is linear, but a
   working tree with thousands of changes has not been tried, and neither has
   a history longer than the thirty commits currently requested.

@@ -17,10 +17,10 @@
       follows the system theme.
     -->
 
-    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="300,*,320">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="260,300,*,320">
 
         <!-- Toolbar spanning the top -->
-        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="3"
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="4"
                                Padding="12,8" Spacing="8">
             <Button Text="Add repository"
                     Command="{Binding AddRepositoryCommand}"
@@ -159,6 +159,7 @@
 
                     <CollectionView x:Name="UnstagedList"
                                     ItemsSource="{Binding Unstaged}"
+                                    SelectedItem="{Binding SelectedUnstagedChange, Mode=TwoWay}"
                                     SelectionMode="Single"
                                     SemanticProperties.Description="Unstaged changes">
                         <CollectionView.EmptyView>
@@ -190,6 +191,7 @@
                 <CollectionView Grid.Row="5"
                                 x:Name="StagedList"
                                 ItemsSource="{Binding Staged}"
+                                SelectedItem="{Binding SelectedStagedChange, Mode=TwoWay}"
                                 SelectionMode="Single"
                                 SemanticProperties.Description="Staged changes">
                     <CollectionView.EmptyView>
@@ -215,9 +217,61 @@
             </Grid>
         </a11y:Pane>
 
+        <!--
+          The diff viewer. Headers and lines share one list so the whole diff
+          reads straight through with Down, and so set positions cover the
+          entire diff rather than restarting at each hunk.
+          See docs/DIFF-VIEWER.md.
+        -->
+        <a11y:Pane x:Name="DiffPane"
+                   Grid.Row="1" Grid.Column="2"
+                   PaneId="diff" PaneName="Diff" PaneOrder="25">
+            <Grid RowDefinitions="Auto,*" Padding="12">
+
+                <Label Grid.Row="0"
+                       Text="{Binding DiffSummary}"
+                       FontSize="14"
+                       Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="1"
+                                x:Name="DiffList"
+                                ItemsSource="{Binding DiffRows}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Diff. Use up and down to move through lines, F7 and Shift F7 to move between differences.">
+                    <CollectionView.EmptyView>
+                        <Label Text="Select a file to see its changes"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DiffRow">
+                            <Grid ColumnDefinitions="44,16,*" Padding="4,1"
+                                  SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Grid.Column="0"
+                                       Text="{Binding LineNumber}"
+                                       FontSize="12"
+                                       Opacity="0.6"
+                                       HorizontalTextAlignment="End"
+                                       FontFamily="Consolas" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding Marker}"
+                                       FontSize="13"
+                                       FontFamily="Consolas" />
+                                <Label Grid.Column="2"
+                                       Text="{Binding Display}"
+                                       FontSize="13"
+                                       FontFamily="Consolas"
+                                       LineBreakMode="TailTruncation" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
         <!-- Commit, branches and history -->
         <a11y:Pane x:Name="CommitPane"
-                   Grid.Row="1" Grid.Column="2"
+                   Grid.Row="1" Grid.Column="3"
                    PaneId="commit" PaneName="Commit" PaneOrder="30">
             <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" Padding="12">
 
@@ -293,7 +347,7 @@
           hears fragments. See docs/ARCHITECTURE.md 3.5.
         -->
         <Label x:Name="StatusLabel"
-               Grid.Row="2" Grid.ColumnSpan="3"
+               Grid.Row="2" Grid.ColumnSpan="4"
                Padding="12,6" FontSize="14" Opacity="0.7" Text=""
                SemanticProperties.Description="Status" />
     </Grid>

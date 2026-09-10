@@ -43,4 +43,20 @@ public static partial class PlatformFocus
         TrackFocusWithinPlatform(element, paneId);
 
     static partial void TrackFocusWithinPlatform(VisualElement element, string paneId);
+
+    /// <summary>
+    /// Move focus to the currently selected item inside a list.
+    ///
+    /// Selecting a row programmatically does not focus it, so without this a
+    /// jump like F7 would announce the destination and leave the user's
+    /// focus behind, unable to read on from where they landed.
+    /// </summary>
+    public static bool TryFocusSelectedItem(VisualElement element)
+    {
+        var handled = false;
+        TryFocusSelectedItemPlatform(element, ref handled);
+        return handled;
+    }
+
+    static partial void TryFocusSelectedItemPlatform(VisualElement element, ref bool handled);
 }

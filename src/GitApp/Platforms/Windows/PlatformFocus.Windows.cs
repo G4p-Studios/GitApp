@@ -124,4 +124,50 @@ public static partial class PlatformFocus
             Hook();
         }
     }
+
+    static partial void TryFocusSelectedItemPlatform(VisualElement element, ref bool handled)
+    {
+        if (element.Handler?.PlatformView is not DependencyObject scope)
+        {
+            return;
+        }
+
+        var selected = FindSelectedContainer(scope);
+        if (selected is not null)
+        {
+            handled = selected.Focus(FocusState.Programmatic);
+        }
+    }
+
+    /// <summary>
+    /// The realized container for the selected row. Virtualization means it
+    /// only exists once the row has been scrolled into view, so callers
+    /// scroll first.
+    /// </summary>
+    private static Control? FindSelectedContainer(DependencyObject root)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+
+            if (child is SelectorItem { IsSelected: true } selector)
+            {
+                return selector;
+            }
+
+            if (child is ItemContainer { IsSelected: true } container)
+            {
+                return container;
+            }
+
+            var found = FindSelectedContainer(child);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
+    }
 }

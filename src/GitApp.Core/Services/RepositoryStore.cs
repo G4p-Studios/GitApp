@@ -29,8 +29,19 @@ public sealed class RepositoryStore
 
     public IReadOnlyList<string> Paths => _paths;
 
+    /// <summary>
+    /// Set when the saved list could not be read. The app still starts with
+    /// an empty list, but it must say so: a silently empty sidebar looks
+    /// identical to never having added anything, and someone who cannot
+    /// glance at the window has no way to tell their repositories went
+    /// missing.
+    /// </summary>
+    public string? LoadError { get; private set; }
+
     public async Task LoadAsync()
     {
+        LoadError = null;
+
         try
         {
             if (!File.Exists(_path))
@@ -42,17 +53,30 @@ public sealed class RepositoryStore
             await using var stream = File.OpenRead(_path);
             _paths = await JsonSerializer.DeserializeAsync<List<string>>(stream) ?? new List<string>();
         }
-        catch (Exception)
+        catch (Exception ex)
         {
             // A corrupt or unreadable list must not stop the app starting.
             // Losing the list is recoverable by re-adding; failing to launch
-            // is not.
+            // is not. But it is reported rather than hidden.
             _paths = new List<string>();
+            LoadError =
+                $"Could not read your saved repository list, so it is empty. " +
+                $"Add repositories again, or fix {_path}. ({ex.Message})";
         }
 
         // Drop anything that has been moved or deleted since last run, so the
-        // user is not offered repositories that cannot be opened.
+        // user is not offered repositories that cannot be opened. Say how
+        // many went, for the same reason as above.
+        var before = _paths.Count;
         _paths = _paths.Where(Directory.Exists).Distinct(StringComparer.OrdinalIgnoreCase).ToList();
+
+        var dropped = before - _paths.Count;
+        if (dropped > 0 && LoadError is null)
+        {
+            LoadError = dropped == 1
+                ? "1 saved repository is no longer on disk and was removed from the list."
+                : $"{dropped} saved repositories are no longer on disk and were removed from the list.";
+        }
     }
 
     public async Task<bool> AddAsync(string repoPath)

@@ -46,7 +46,7 @@ public static partial class PaneNavigation
 
     private static void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key != VirtualKey.F6)
+        if (e.Key is not (VirtualKey.F6 or VirtualKey.F7))
         {
             return;
         }
@@ -55,13 +55,25 @@ public static partial class PaneNavigation
             .GetKeyStateForCurrentThread(VirtualKey.Shift)
             .HasFlag(CoreVirtualKeyStates.Down);
 
-        if (shift)
+        if (e.Key == VirtualKey.F6)
         {
-            Previous();
+            if (shift)
+            {
+                Previous();
+            }
+            else
+            {
+                Next();
+            }
         }
         else
         {
-            Next();
+            // F7 and Shift+F7 move between differences, matching VS Code's
+            // accessible diff viewer so the muscle memory transfers.
+            if (!MoveToHunk(shift ? -1 : 1))
+            {
+                return;
+            }
         }
 
         // Mark handled so the key does not also reach the focused control.
