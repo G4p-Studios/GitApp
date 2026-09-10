@@ -120,3 +120,9 @@ ehthumbs.db
 Desktop.ini
 $RECYCLE.BIN/
 .DS_Store
+
+# ---------------------------------------------------------------------------
+# Claude Code
+# settings.json is shared; settings.local.json is per-machine.
+# ---------------------------------------------------------------------------
+.claude/settings.local.json
