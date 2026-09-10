@@ -2,48 +2,71 @@
 <ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
              xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
              xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
              x:Class="GitApp.MainPage"
+             x:DataType="vm:MainViewModel"
              Title="GitApp">
 
     <!--
-      Milestone 1 shell.
+      Four panes, cycled with F6: Repositories, Changes, Commit, History.
 
-      Exists to prove the accessibility substrate before any feature depends
-      on it: panes cycled with F6, a list with honest set positions, a status
-      live region, and announcements. The data is placeholder. The interaction
-      model is not.
-
-      No literal colours anywhere. MAUI follows the system light, dark and
-      high contrast themes on its own; see src/GitApp/Theme/Tokens.cs.
+      Every list gives its rows a single accessible name in reading order,
+      because a row is announced as one label. Every action that can outlast
+      a second announces its start and its result. No literal colours; MAUI
+      follows the system theme.
     -->
 
-    <Grid RowDefinitions="*,Auto" ColumnDefinitions="280,*">
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="300,*,320">
 
+        <!-- Toolbar spanning the top -->
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="3"
+                               Padding="12,8" Spacing="8">
+            <Button Text="Add repository"
+                    Command="{Binding AddRepositoryCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Choose a folder containing a Git repository" />
+            <Button Text="Remove"
+                    Command="{Binding RemoveRepositoryCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Removes the repository from this list. The folder on disk is not deleted." />
+            <Button Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32" />
+            <BoxView WidthRequest="1" Margin="4,0" />
+            <Button Text="Fetch"
+                    Command="{Binding FetchCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Downloads new commits without changing your working tree" />
+            <Button Text="Pull"
+                    Command="{Binding PullCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Fast-forward only" />
+            <Button Text="Push"
+                    Command="{Binding PushCommand}"
+                    MinimumHeightRequest="32" />
+        </HorizontalStackLayout>
+
+        <!-- Repositories -->
         <a11y:Pane x:Name="ReposPane"
-                   Grid.Row="0" Grid.Column="0"
-                   PaneId="repos"
-                   PaneName="Repositories"
-                   PaneOrder="10">
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="repos" PaneName="Repositories" PaneOrder="10">
             <VerticalStackLayout Padding="8">
-                <Label Text="Repositories"
-                       FontSize="12"
-                       Opacity="0.7"
+                <Label Text="Repositories" FontSize="12" Opacity="0.7"
                        Margin="4,0,0,4"
                        SemanticProperties.HeadingLevel="Level2" />
 
                 <CollectionView x:Name="RepoList"
-                                ItemsSource="{Binding Repos}"
+                                ItemsSource="{Binding Repositories}"
+                                SelectedItem="{Binding SelectedRepository, Mode=TwoWay}"
                                 SelectionMode="Single"
-                                SelectionChanged="OnRepoSelected"
                                 SemanticProperties.Description="Repositories">
+                    <CollectionView.EmptyView>
+                        <Label Text="No repositories yet. Use Add repository to get started."
+                               Padding="12" FontSize="14" />
+                    </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
-                        <DataTemplate>
-                            <!--
-                              One accessible name for the whole row, in reading
-                              order. CollectionView supplies the list and item
-                              roles, the set positions and the selection
-                              pattern; we only supply the name.
-                            -->
+                        <DataTemplate x:DataType="vm:RepositoryItem">
                             <VerticalStackLayout Padding="8,4"
                                                  SemanticProperties.Description="{Binding AccessibleName}">
                                 <Label Text="{Binding Name}" FontSize="14" />
@@ -55,50 +78,143 @@
             </VerticalStackLayout>
         </a11y:Pane>
 
-        <a11y:Pane x:Name="DetailPane"
-                   Grid.Row="0" Grid.Column="1"
-                   PaneId="detail"
-                   PaneName="Repository details"
-                   PaneOrder="20">
-            <VerticalStackLayout Padding="24" Spacing="4">
-                <Label x:Name="TitleLabel"
-                       Text="gitapp"
-                       FontSize="28"
-                       SemanticProperties.HeadingLevel="Level1" />
+        <!-- Changes -->
+        <a11y:Pane x:Name="ChangesPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="changes" PaneName="Changes" PaneOrder="20">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,*" Padding="12">
 
-                <Label x:Name="SubtitleLabel"
-                       Text="On branch main, 2 ahead"
-                       FontSize="14"
-                       Opacity="0.7"
-                       Margin="0,0,0,16" />
+                <Label Grid.Row="0" Text="{Binding RepositoryTitle}"
+                       FontSize="20" SemanticProperties.HeadingLevel="Level1" />
 
-                <HorizontalStackLayout Spacing="8">
-                    <Button x:Name="FetchButton"
-                            Text="Fetch"
-                            MinimumHeightRequest="32"
-                            Clicked="OnFetch"
-                            SemanticProperties.Hint="Downloads new commits without changing your working tree" />
-                    <Button Text="Pull"
-                            MinimumHeightRequest="32"
-                            Clicked="OnNotImplemented" />
-                    <Button Text="Push"
-                            MinimumHeightRequest="32"
-                            Clicked="OnNotImplemented" />
-                </HorizontalStackLayout>
-            </VerticalStackLayout>
+                <Label Grid.Row="1" Text="{Binding BranchSummary}"
+                       FontSize="14" Opacity="0.7" Margin="0,0,0,12" />
+
+                <VerticalStackLayout Grid.Row="2">
+                    <HorizontalStackLayout Spacing="8" Margin="0,0,0,4">
+                        <Label Text="Unstaged" FontSize="12" Opacity="0.7"
+                               VerticalOptions="Center"
+                               SemanticProperties.HeadingLevel="Level2" />
+                        <Button Text="Stage all"
+                                Command="{Binding StageAllCommand}"
+                                FontSize="12" Padding="8,0" MinimumHeightRequest="28" />
+                    </HorizontalStackLayout>
+
+                    <CollectionView x:Name="UnstagedList"
+                                    ItemsSource="{Binding Unstaged}"
+                                    SelectionMode="Single"
+                                    SemanticProperties.Description="Unstaged changes">
+                        <CollectionView.EmptyView>
+                            <Label Text="Nothing unstaged" Padding="8" FontSize="13" Opacity="0.7" />
+                        </CollectionView.EmptyView>
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="domain:FileChange">
+                                <Grid ColumnDefinitions="*,Auto" Padding="8,4"
+                                      SemanticProperties.Description="{Binding AccessibleName}">
+                                    <VerticalStackLayout Grid.Column="0">
+                                        <Label Text="{Binding FileName}" FontSize="14" />
+                                        <Label Text="{Binding StateDescription}" FontSize="12" Opacity="0.7" />
+                                    </VerticalStackLayout>
+                                    <Button Grid.Column="1" Text="Stage"
+                                            FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.StageCommand}"
+                                            CommandParameter="{Binding .}"
+                                            SemanticProperties.Description="{Binding FileName, StringFormat='Stage {0}'}" />
+                                </Grid>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <Label Grid.Row="3" Text="Staged" FontSize="12" Opacity="0.7"
+                       Margin="0,12,0,4"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="4"
+                                x:Name="StagedList"
+                                ItemsSource="{Binding Staged}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Staged changes">
+                    <CollectionView.EmptyView>
+                        <Label Text="Nothing staged" Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:FileChange">
+                            <Grid ColumnDefinitions="*,Auto" Padding="8,4"
+                                  SemanticProperties.Description="{Binding AccessibleName}">
+                                <VerticalStackLayout Grid.Column="0">
+                                    <Label Text="{Binding FileName}" FontSize="14" />
+                                    <Label Text="{Binding StateDescription}" FontSize="12" Opacity="0.7" />
+                                </VerticalStackLayout>
+                                <Button Grid.Column="1" Text="Unstage"
+                                        FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.UnstageCommand}"
+                                        CommandParameter="{Binding .}"
+                                        SemanticProperties.Description="{Binding FileName, StringFormat='Unstage {0}'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <!-- Commit and history -->
+        <a11y:Pane x:Name="CommitPane"
+                   Grid.Row="1" Grid.Column="2"
+                   PaneId="commit" PaneName="Commit" PaneOrder="30">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="12">
+
+                <Label Grid.Row="0" Text="Commit message" FontSize="12" Opacity="0.7"
+                       Margin="0,0,0,4"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <Editor Grid.Row="1"
+                        x:Name="CommitMessageEditor"
+                        Text="{Binding CommitMessage, Mode=TwoWay}"
+                        HeightRequest="90"
+                        AutoSize="Disabled"
+                        SemanticProperties.Description="Commit message"
+                        SemanticProperties.Hint="Describe what changed and why" />
+
+                <Button Grid.Row="2" Text="Commit"
+                        Command="{Binding CommitCommand}"
+                        Margin="0,8,0,0"
+                        MinimumHeightRequest="32"
+                        SemanticProperties.Hint="Commits the staged changes" />
+
+                <Label Grid.Row="3" Text="History" FontSize="12" Opacity="0.7"
+                       Margin="0,16,0,4"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="4"
+                                x:Name="HistoryList"
+                                ItemsSource="{Binding Commits}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Recent commits">
+                    <CollectionView.EmptyView>
+                        <Label Text="No commits" Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:CommitInfo">
+                            <VerticalStackLayout Padding="8,4"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Subject}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
         </a11y:Pane>
 
         <!--
           The application status line. One live region for the whole app:
-          multiple simultaneous regions race each other in the speech queue
-          and the user hears fragments. See docs/ARCHITECTURE.md section 3.5.
+          multiple simultaneous regions race in the speech queue and the user
+          hears fragments. See docs/ARCHITECTURE.md 3.5.
         -->
         <Label x:Name="StatusLabel"
-               Grid.Row="1" Grid.ColumnSpan="2"
-               Padding="12,4"
-               FontSize="14"
-               Opacity="0.7"
-               Text=""
+               Grid.Row="2" Grid.ColumnSpan="3"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
                SemanticProperties.Description="Status" />
     </Grid>
 </ContentPage>

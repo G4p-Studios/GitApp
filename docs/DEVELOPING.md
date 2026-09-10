@@ -31,17 +31,18 @@ no combined build, because neither OS can build the other's target.
 
 ## Tests
 
-Not yet re-established after the move from React Native. See
-`docs/ARCHITECTURE.md` section 3.7 for what needs to exist.
+```powershell
+dotnet test
+```
 
-The short version: MAUI supplies the semantics the old prop-level suite
-asserted, so re-asserting them would mostly be testing Microsoft's code. The
-layer worth building is the live UI Automation check, modelled on the
-Axe.Windows suite in `microsoft/react-native-gallery`, which drives the
-running app and snapshots what a screen reader would actually see.
+`tests/GitApp.Core.Tests/` covers the porcelain parsing in `GitApp.Core`,
+which is the logic most able to be quietly wrong. Fixtures are real git
+output, not examples from the documentation.
 
-Until that exists, verification is manual. Every feature needs a pass with
-NVDA and Narrator before it is called done.
+There is deliberately no unit test asserting that a CollectionView reports
+set positions or handles arrow keys. MAUI supplies those and re-asserting
+them would be testing Microsoft's code. What is missing instead is the live
+UI Automation layer described below, and that gap is real.
 
 ## How this project verifies accessibility
 

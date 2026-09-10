@@ -250,28 +250,33 @@ wrong thing.
 
 Accessibility is verified by tests, not by intention.
 
-1. **Prop-level tree snapshots**, in `tests/a11y/`. These run under Jest and
-   assert the accessibility props we declare: control type, name, description,
-   set positions, and the single-tab-stop invariant. Fast, they gate CI, and
-   they catch most regressions. They are not a UIA dump, and they say so.
-2. **Live UIA snapshots**, against the running app. `microsoft/react-native-gallery`
-   solves this with a C# test project that drives the deployed app through
-   `System.Windows.Automation` and scans it with **Axe.Windows**, the engine
-   behind Accessibility Insights, writing a committed JSON snapshot. That is
-   the model to copy: it is the only way to see what a screen reader actually
-   sees, including what Fabric decides not to put in the tree.
+1. **Unit tests over the parsing layer**, in `tests/GitApp.Core.Tests/`.
+   `GitApp.Core` has no UI framework dependency, so the logic that is easiest
+   to get quietly wrong is testable as plain functions. The fixtures are real
+   git output rather than examples from the documentation, because the
+   failure being guarded against is a mismatch between the two.
 
-   Not yet built here, and the gap is not theoretical. Two bugs in the first
-   shell were invisible to every prop-level test and to the type checker, and
-   surfaced only on reading the live tree: `accessible={false}` on a container
-   deleted both panes from the UIA tree, and a missing `accessible` removed
-   the status bar and its live region. Both files read as correct.
-3. **Keyboard reachability tests.** For each screen, assert that every
-   interactive element is reachable by Tab and arrow keys from the pane root, and
-   that every mouse action has a context-menu equivalent.
-4. **Manual screen reader pass.** NVDA and Narrator, both, before any feature is
-   called done. JAWS before each release. A per-screen checklist lives beside
-   the screen's code.
+   The rename case has its own test. A type 2 porcelain record is followed by
+   its original path as a separate NUL-delimited field, so a naive split
+   attributes every subsequent row to the wrong file. That is silent, and it
+   would tell a user they are about to commit a file they are not.
+
+2. **Live UI Automation checks**, against the running app. Not yet automated.
+   `microsoft/react-native-gallery` does this with a C# test project driving
+   the deployed app through `System.Windows.Automation` and scanning with
+   Axe.Windows; that is the model to copy.
+
+   The gap is not theoretical. Every accessibility bug in this project so far
+   was invisible to the compiler and to any unit test, and several looked
+   correct in source. Until it is automated, the check is manual and the
+   method is in `docs/DEVELOPING.md`.
+
+3. **Keyboard reachability.** For each screen, every interactive element
+   reachable by Tab and arrow keys from the pane root, and every mouse action
+   available from the keyboard.
+
+4. **Manual screen reader pass.** NVDA and Narrator, both, before any feature
+   is called done. JAWS before each release.
 
 CI gates on items 1 and 3. Items 2 and 4 gate the release.
 
@@ -418,31 +423,43 @@ underneath the user's cursor as the result of a background refresh.
   - `Theme/` - spacing, type and metric tokens.
   - `Platforms/Windows/` - the F6 key hook and the focus helpers.
   - `Platforms/MacCatalyst/` - the macOS equivalents, once Catalyst is verified.
+- `src/GitApp.Core/` - Domain and Services, with no UI framework dependency,
+  so the logic is testable and survives a change of shell.
 - `docs/` - this specification, the MAUI spike, and the developer notes.
-- `tests/` - to be re-established; see 3.7.
+- `tests/GitApp.Core.Tests/` - unit tests over the parsing layer.
 
 High contrast is a first-class theme rather than an afterthought. MAUI
 supplies it, and the theme rule in 3.8 is what keeps it working.
 
 ## 6. Milestones
 
-1. **Foundations.** RNW 0.84 app shell, F6 pane model, menu bar, FocusManager,
-   Announcer, and the UIA snapshot test harness. Nothing else. This milestone
-   exists to prove the accessibility substrate before any feature depends on it.
-2. **Local repositories.** GitModule, clone, status, stage, commit, push, pull,
-   branch switching. Verified with NVDA end to end.
+1. **Foundations.** Done. App shell, F6 pane model, FocusManager, Announcer,
+   and the platform focus helpers.
+2. **Local repositories.** Largely done. Add and remove repositories, status,
+   stage, unstage, commit, fetch, pull, push, and history, all against real
+   repositories through git.exe. Still missing: branch switching, diffs,
+   clone, and conflict resolution.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code view.
 4. **GitHub write.** Comment, review, merge, release management.
 5. **Notifications.** Polling, toasts, inbox.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.
 
+Milestone 2 deliberately shipped `--ff-only` pulls. A merge or rebase can
+leave the user mid-conflict, and conflict resolution does not exist yet;
+refusing is honest, and the refusal says why.
+
 ## 7. Open questions
 
-- Does a commit list built as a `list` of composite rows read acceptably in NVDA
-  and JAWS, or does it need a XAML island grid? Resolve with a prototype during
-  milestone 1, before the pattern is used in twenty places.
-- Diff presentation for screen readers is genuinely unsolved in every Git client,
-  FastGH included. It deserves its own design document rather than a paragraph
-  here.
-- Whether to bundle Git or require it. Bundling is assumed above, but installer
-  size may argue otherwise.
+- **Mac Catalyst is entirely unverified.** No Apple hardware is available to
+  this project. F6 has no implementation there and is the wrong gesture for
+  macOS regardless; region navigation will need a VoiceOver-native answer.
+- **Diff presentation for screen readers is unsolved** in every Git client,
+  FastGH and GitHub Desktop included. It deserves its own design document
+  rather than a paragraph here, and it is the single hardest remaining
+  problem in the app.
+- **Large repositories are untested.** Status parsing is linear, but a
+  working tree with thousands of changes has not been tried, and neither has
+  a history longer than the thirty commits currently requested.
+- **Whether to bundle Git.** Currently GitApp calls whatever `git` is on
+  PATH, and says so plainly when it cannot find one. Bundling removes a
+  prerequisite at the cost of installer size.

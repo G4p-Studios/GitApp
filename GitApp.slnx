@@ -1,5 +1,9 @@
 <Solution>
   <Folder Name="/src/">
+    <Project Path="src/GitApp.Core/GitApp.Core.csproj" />
     <Project Path="src/GitApp/GitApp.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/GitApp.Core.Tests/GitApp.Core.Tests.csproj" />
   </Folder>
 </Solution>
