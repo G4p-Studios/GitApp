@@ -110,6 +110,13 @@ export function List<T>({
 
   const setSize = totalCount ?? items.length;
 
+  // Claim this pane's entry point, so entering the pane lands on the list
+  // rather than on the pane wrapper. Re-run when the active row changes so
+  // the claim always points at a row that exists.
+  useEffect(() => {
+    pane?.setEntry(rowRefs.current.get(activeIndex) ?? null);
+  }, [pane, activeIndex, items.length]);
+
   // Keep the active index inside the data when the list shrinks under us
   // (a filter narrowed it, a repo was removed). Without this the roving
   // tabindex points at nothing and Tab into the list lands on the window.

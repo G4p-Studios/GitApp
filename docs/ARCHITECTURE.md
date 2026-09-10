@@ -187,6 +187,18 @@ Windows conventions, implemented by us because nothing implements them for us:
   by mouse. This is the primary accessible action surface in the app.
 - **Alt** enters the menu bar.
 
+**Every window opens with a control focused.** `PaneHost` focuses the first
+pane's content on mount, and a pane's content control claims the entry point so
+that entering a pane lands on the list rather than on the wrapper. Nothing sets
+this for us: without it the window has no focused descendant, which shows up as
+no focus indicator until the user presses Tab, and as a screen reader with
+nothing to announce beyond the window title. Windows restores focus to the last
+focused child on reactivation, but only if something held focus to begin with.
+
+The initial focus is deliberately silent. The screen reader already announces
+the window and the newly focused control on activation, so emitting our own
+"X pane" on top of that is duplicate speech.
+
 Focus restoration is centralized in a `FocusManager` service. Any code path that
 destroys the focused element must have pushed a restore target first. Losing
 focus to the window root is the single most common way a screen reader app

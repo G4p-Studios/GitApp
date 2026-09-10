@@ -29,7 +29,16 @@ type PaneRecord = {
   name: string;
   /** Cycle position. Panes are visited in ascending order. */
   order: number;
-  /** Focus target used when the pane has not been visited yet. */
+  /**
+   * The pane container itself. Last-resort focus target, used only when the
+   * pane holds nothing focusable: an empty list, a loading state.
+   */
+  container: Focusable;
+  /**
+   * A content control that has claimed the pane's entry point, such as its
+   * list. Preferred over the container, so entering a pane lands on something
+   * the user can act on rather than on the wrapper.
+   */
   entry: Focusable;
   /** Where focus was when the user last left this pane. */
   lastFocused: Focusable;
@@ -86,8 +95,15 @@ class FocusManagerImpl {
   // Panes
   // ---------------------------------------------------------------------
 
-  registerPane(pane: Omit<PaneRecord, 'lastFocused'>): () => void {
-    this.panes.set(pane.id, {...pane, lastFocused: null});
+  registerPane(pane: Omit<PaneRecord, 'lastFocused' | 'entry'>): () => void {
+    const existing = this.panes.get(pane.id);
+    this.panes.set(pane.id, {
+      ...pane,
+      // Re-registration must not discard a claim the content already made;
+      // Pane re-registers whenever its name or order changes.
+      entry: existing?.entry ?? null,
+      lastFocused: existing?.lastFocused ?? null,
+    });
 
     if (this.activePane === null) {
       this.activePane = pane.id;
@@ -101,12 +117,31 @@ class FocusManagerImpl {
     };
   }
 
-  /** Update a pane's entry target once its first focusable child mounts. */
+  /**
+   * A content control claims the pane's entry point. Called by List and other
+   * composite widgets as they mount.
+   */
   setPaneEntry(id: PaneId, entry: Focusable): void {
     const pane = this.panes.get(id);
     if (pane) {
       pane.entry = entry;
     }
+  }
+
+  /**
+   * Keep the container ref fresh. Separate from setPaneEntry because Pane
+   * re-runs this on every render, and it must not overwrite a content claim.
+   */
+  setPaneContainer(id: PaneId, container: Focusable): void {
+    const pane = this.panes.get(id);
+    if (pane) {
+      pane.container = container;
+    }
+  }
+
+  /** The first pane in cycle order, for initial focus. */
+  firstPane(): PaneRecord | null {
+    return this.orderedPanes()[0] ?? null;
   }
 
   /**
@@ -144,17 +179,24 @@ class FocusManagerImpl {
     const nextIndex = (from + direction + ordered.length) % ordered.length;
     const next = ordered[nextIndex];
 
-    this.enterPane(next);
+    this.enterPane(next, true);
     return next;
   }
 
-  /** Jump directly to a pane by id, e.g. from a menu command. */
-  focusPane(id: PaneId): PaneRecord | null {
+  /**
+   * Jump directly to a pane by id, e.g. from a menu command.
+   *
+   * `announce: false` moves focus without notifying subscribers. Used for the
+   * initial focus at startup, where the screen reader already announces the
+   * window and the newly focused control, and our own "X pane" on top of that
+   * is just noise.
+   */
+  focusPane(id: PaneId, options?: {announce?: boolean}): PaneRecord | null {
     const pane = this.panes.get(id);
     if (!pane) {
       return null;
     }
-    this.enterPane(pane);
+    this.enterPane(pane, options?.announce ?? true);
     return pane;
   }
 
@@ -173,23 +215,29 @@ class FocusManagerImpl {
     this.activePane = null;
   }
 
-  private enterPane(pane: PaneRecord): void {
+  private enterPane(pane: PaneRecord, announce: boolean): void {
     this.activePane = pane.id;
 
-    // Prefer where the user last was; fall back to the pane's entry point.
-    if (!tryFocus(pane.lastFocused)) {
-      tryFocus(pane.entry);
+    // Where the user last was, then the content's entry point, then the
+    // container as a last resort.
+    if (!tryFocus(pane.lastFocused) && !tryFocus(pane.entry)) {
+      tryFocus(pane.container);
     }
 
-    for (const listener of this.paneListeners) {
-      listener(pane);
+    if (announce) {
+      for (const listener of this.paneListeners) {
+        listener(pane);
+      }
     }
   }
 
   private focusActivePane(): void {
     const pane = this.getActivePane();
-    if (pane && !tryFocus(pane.lastFocused)) {
-      tryFocus(pane.entry);
+    if (!pane) {
+      return;
+    }
+    if (!tryFocus(pane.lastFocused) && !tryFocus(pane.entry)) {
+      tryFocus(pane.container);
     }
   }
 

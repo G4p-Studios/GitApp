@@ -44,6 +44,13 @@ type PaneContextValue = {
    * their place in a thousand-row list.
    */
   noteFocus: (target: {focus: () => void} | null) => void;
+  /**
+   * A content control claims the pane's entry point, so entering the pane
+   * lands on the list rather than on the pane container. Without this the
+   * user hears "Repositories pane" and then has to Tab again to reach
+   * anything.
+   */
+  setEntry: (target: {focus: () => void} | null) => void;
 };
 
 const PaneContext = createContext<PaneContextValue | null>(null);
@@ -68,6 +75,26 @@ export function usePane(): PaneContextValue | null {
  * braces against a future non-exact matcher.
  */
 export function PaneHost({children}: {children: React.ReactNode}) {
+  // Put focus somewhere meaningful as soon as the window opens.
+  //
+  // Without this the window has no focused control, which has two visible
+  // consequences: there is no focus indicator until the user presses Tab, and
+  // a screen reader has nothing to announce beyond the window title. A
+  // Windows app is expected to open with a sensible control focused.
+  //
+  // Deferred by a frame because panes register in their own effects, and
+  // children mount before parents' effects run.
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      const first = FocusManager.firstPane();
+      if (first) {
+        FocusManager.focusPane(first.id, {announce: false});
+      }
+    }, 0);
+
+    return () => clearTimeout(timer);
+  }, []);
+
   useEffect(
     () =>
       FocusManager.subscribeToPaneChange(pane => {
@@ -113,21 +140,23 @@ export function Pane({id, name, order, style, children}: PaneProps) {
   const ref = useRef<React.ComponentRef<typeof View>>(null);
 
   useEffect(
-    () => FocusManager.registerPane({id, name, order, entry: ref.current}),
+    () => FocusManager.registerPane({id, name, order, container: ref.current}),
     [id, name, order],
   );
 
-  // Keep the entry target fresh across re-renders; the first render registers
-  // with a null ref because refs attach after the effect's dependencies are
-  // captured.
+  // Keep the container ref fresh across re-renders; the first render
+  // registers with a null ref because refs attach after the effect's
+  // dependencies are captured. This deliberately does not touch the entry
+  // slot, which belongs to whichever content control claimed it.
   useEffect(() => {
-    FocusManager.setPaneEntry(id, ref.current);
+    FocusManager.setPaneContainer(id, ref.current);
   });
 
   const value = useMemo<PaneContextValue>(
     () => ({
       paneId: id,
       noteFocus: target => FocusManager.noteFocusWithin(id, target),
+      setEntry: target => FocusManager.setPaneEntry(id, target),
     }),
     [id],
   );
