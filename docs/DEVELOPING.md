@@ -7,6 +7,8 @@
   and a Windows 11 SDK.
 - **Node 22.11 or newer.**
 - **Windows 11 SDK 10.0.26100.0.** See the pin below before changing this.
+- **Developer Mode enabled.** Settings, System, For developers, Developer Mode.
+  Without it the app compiles but cannot deploy. See below.
 
 Microsoft ships a dependency checker that installs what is missing:
 
@@ -60,6 +62,30 @@ overwriting the pin.
 Raise the pin when the build machines move to a newer SDK. Leave
 `TargetPlatformMinVersion` alone; it governs which Windows versions the app
 still runs on.
+
+### Deploy fails with exit error code 5
+
+```
+DeployRecipeFailure: Deploying ...\gitapp.Package.build.appxrecipe - exit error code 5
+```
+
+Code 5 is ACCESS_DENIED, and it means Developer Mode is off. The compile
+succeeds and produces `windowsd\Debug\gitapp.exe`; only registering the
+app package fails, which is why the error arrives at the very end of a long
+build and looks worse than it is.
+
+Enable it in Settings, System, For developers. From an elevated prompt:
+
+```powershell
+reg add "HKLM\SOFTWARE\Microsoft\Windows\CurrentVersion\AppModelUnlock" `
+  /t REG_DWORD /f /v AllowDevelopmentWithoutDevLicense /d 1
+```
+
+Running the built `.exe` directly instead is not a workaround. The cpp-app
+template builds against the Windows App SDK and expects package identity; the
+process starts, creates no window, and exits nothing to the console. GitApp
+needs package identity anyway for toast notifications, so packaged deployment
+is the supported path rather than a development convenience.
 
 ### `npm install` and the `allow-scripts` config key
 
