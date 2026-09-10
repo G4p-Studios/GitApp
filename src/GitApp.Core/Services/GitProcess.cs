@@ -61,10 +61,16 @@ public sealed class GitProcess
         "-c", "core.quotepath=false",
     };
 
+    /// <param name="onProgress">
+    /// Called for each stderr line as it arrives. Git writes progress there,
+    /// so this is how a long operation stops being silent. Clone and fetch
+    /// pass it; short commands do not need it.
+    /// </param>
     public async Task<GitResult> RunAsync(
         string workingDirectory,
         IEnumerable<string> args,
-        CancellationToken cancellationToken = default)
+        CancellationToken cancellationToken = default,
+        Action<string>? onProgress = null)
     {
         var info = new ProcessStartInfo
         {

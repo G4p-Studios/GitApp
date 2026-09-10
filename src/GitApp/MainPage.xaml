@@ -26,6 +26,10 @@
                     Command="{Binding AddRepositoryCommand}"
                     MinimumHeightRequest="32"
                     SemanticProperties.Hint="Choose a folder containing a Git repository" />
+            <Button Text="Clone"
+                    Command="{Binding CloneCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Clone a repository from a URL into a folder you choose" />
             <Button Text="Remove"
                     Command="{Binding RemoveRepositoryCommand}"
                     MinimumHeightRequest="32"
@@ -82,7 +86,7 @@
         <a11y:Pane x:Name="ChangesPane"
                    Grid.Row="1" Grid.Column="1"
                    PaneId="changes" PaneName="Changes" PaneOrder="20">
-            <Grid RowDefinitions="Auto,Auto,*,Auto,*" Padding="12">
+            <Grid RowDefinitions="Auto,Auto,Auto,*,Auto,*" Padding="12">
 
                 <Label Grid.Row="0" Text="{Binding RepositoryTitle}"
                        FontSize="20" SemanticProperties.HeadingLevel="Level1" />
@@ -90,7 +94,60 @@
                 <Label Grid.Row="1" Text="{Binding BranchSummary}"
                        FontSize="14" Opacity="0.7" Margin="0,0,0,12" />
 
-                <VerticalStackLayout Grid.Row="2">
+                <!--
+                  Conflicts, shown only during a merge. First in the pane
+                  because nothing else in the repository can proceed until
+                  they are dealt with.
+                -->
+                <VerticalStackLayout Grid.Row="2" IsVisible="{Binding IsMerging}" Margin="0,0,0,12">
+                    <HorizontalStackLayout Spacing="8" Margin="0,0,0,4">
+                        <Label Text="{Binding MergeSummary}" FontSize="14"
+                               VerticalOptions="Center"
+                               SemanticProperties.HeadingLevel="Level2" />
+                        <Button Text="Abort merge"
+                                Command="{Binding AbortMergeCommand}"
+                                FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                SemanticProperties.Hint="Throws away the merge and any resolution done so far" />
+                    </HorizontalStackLayout>
+
+                    <CollectionView x:Name="ConflictList"
+                                    ItemsSource="{Binding Conflicts}"
+                                    SelectionMode="Single"
+                                    SemanticProperties.Description="Conflicted files">
+                        <CollectionView.ItemTemplate>
+                            <DataTemplate x:DataType="domain:FileChange">
+                                <VerticalStackLayout Padding="8,4"
+                                                     SemanticProperties.Description="{Binding AccessibleName}">
+                                    <Label Text="{Binding FileName}" FontSize="14" />
+                                    <Label Text="{Binding Directory}" FontSize="12" Opacity="0.7" />
+                                    <!--
+                                      Each side is named by its branch. "Ours"
+                                      and "theirs" are ambiguous even to people
+                                      who use git every day, and worse when
+                                      heard rather than read.
+                                    -->
+                                    <HorizontalStackLayout Spacing="6" Margin="0,4,0,0">
+                                        <Button Text="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.KeepOursLabel}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.KeepOursCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12" Padding="8,0" MinimumHeightRequest="28" />
+                                        <Button Text="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.KeepTheirsLabel}"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.KeepTheirsCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12" Padding="8,0" MinimumHeightRequest="28" />
+                                        <Button Text="Mark resolved"
+                                                Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MarkResolvedCommand}"
+                                                CommandParameter="{Binding .}"
+                                                FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                                SemanticProperties.Hint="Use after editing the file yourself" />
+                                    </HorizontalStackLayout>
+                                </VerticalStackLayout>
+                            </DataTemplate>
+                        </CollectionView.ItemTemplate>
+                    </CollectionView>
+                </VerticalStackLayout>
+
+                <VerticalStackLayout Grid.Row="3">
                     <HorizontalStackLayout Spacing="8" Margin="0,0,0,4">
                         <Label Text="Unstaged" FontSize="12" Opacity="0.7"
                                VerticalOptions="Center"
@@ -126,11 +183,11 @@
                     </CollectionView>
                 </VerticalStackLayout>
 
-                <Label Grid.Row="3" Text="Staged" FontSize="12" Opacity="0.7"
+                <Label Grid.Row="4" Text="Staged" FontSize="12" Opacity="0.7"
                        Margin="0,12,0,4"
                        SemanticProperties.HeadingLevel="Level2" />
 
-                <CollectionView Grid.Row="4"
+                <CollectionView Grid.Row="5"
                                 x:Name="StagedList"
                                 ItemsSource="{Binding Staged}"
                                 SelectionMode="Single"
@@ -158,11 +215,11 @@
             </Grid>
         </a11y:Pane>
 
-        <!-- Commit and history -->
+        <!-- Commit, branches and history -->
         <a11y:Pane x:Name="CommitPane"
                    Grid.Row="1" Grid.Column="2"
                    PaneId="commit" PaneName="Commit" PaneOrder="30">
-            <Grid RowDefinitions="Auto,Auto,Auto,Auto,*" Padding="12">
+            <Grid RowDefinitions="Auto,Auto,Auto,Auto,Auto,Auto,*" Padding="12">
 
                 <Label Grid.Row="0" Text="Commit message" FontSize="12" Opacity="0.7"
                        Margin="0,0,0,4"
@@ -182,11 +239,34 @@
                         MinimumHeightRequest="32"
                         SemanticProperties.Hint="Commits the staged changes" />
 
-                <Label Grid.Row="3" Text="History" FontSize="12" Opacity="0.7"
+                <HorizontalStackLayout Grid.Row="3" Spacing="8" Margin="0,16,0,4">
+                    <Label Text="Branches" FontSize="12" Opacity="0.7"
+                           VerticalOptions="Center"
+                           SemanticProperties.HeadingLevel="Level2" />
+                    <Button Text="New branch"
+                            Command="{Binding CreateBranchCommand}"
+                            FontSize="12" Padding="8,0" MinimumHeightRequest="28" />
+                </HorizontalStackLayout>
+
+                <!--
+                  A picker rather than a list: it is a single choice, it
+                  reports the current value without the user having to hunt
+                  for it, and it is one tab stop instead of one per branch.
+                -->
+                <Picker Grid.Row="4"
+                        x:Name="BranchPicker"
+                        ItemsSource="{Binding Branches}"
+                        SelectedItem="{Binding SelectedBranch, Mode=TwoWay}"
+                        ItemDisplayBinding="{Binding AccessibleName}"
+                        Title="Switch branch"
+                        SemanticProperties.Description="Current branch"
+                        SemanticProperties.Hint="Choosing a branch switches to it" />
+
+                <Label Grid.Row="5" Text="History" FontSize="12" Opacity="0.7"
                        Margin="0,16,0,4"
                        SemanticProperties.HeadingLevel="Level2" />
 
-                <CollectionView Grid.Row="4"
+                <CollectionView Grid.Row="6"
                                 x:Name="HistoryList"
                                 ItemsSource="{Binding Commits}"
                                 SelectionMode="Single"

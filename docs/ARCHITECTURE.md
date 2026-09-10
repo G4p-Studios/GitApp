@@ -435,18 +435,24 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
 
 1. **Foundations.** Done. App shell, F6 pane model, FocusManager, Announcer,
    and the platform focus helpers.
-2. **Local repositories.** Largely done. Add and remove repositories, status,
-   stage, unstage, commit, fetch, pull, push, and history, all against real
-   repositories through git.exe. Still missing: branch switching, diffs,
-   clone, and conflict resolution.
+2. **Local repositories.** Done except diffs. Add, remove and clone
+   repositories, status, stage, unstage, commit, fetch, pull, push, history,
+   branch switching and creation, and conflict resolution, all against real
+   repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code view.
 4. **GitHub write.** Comment, review, merge, release management.
 5. **Notifications.** Polling, toasts, inbox.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.
 
-Milestone 2 deliberately shipped `--ff-only` pulls. A merge or rebase can
-leave the user mid-conflict, and conflict resolution does not exist yet;
-refusing is honest, and the refusal says why.
+Pull still fast-forwards first, because a fast-forward cannot conflict and so
+can never leave the user somewhere they did not ask to be. When that is
+refused, the app offers a merge rather than performing one, and says that
+conflicts may follow.
+
+Conflict resolution names each side by its branch, "Keep main" and
+"Keep feature", never "ours" and "theirs". Those two words are ambiguous even
+to people who use git daily, and worse heard than read: during a merge
+"ours" is the branch you are on, but during a rebase it is the opposite.
 
 ## 7. Open questions
 

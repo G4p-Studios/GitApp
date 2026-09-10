@@ -23,6 +23,17 @@ public partial class MainPage : ContentPage
         PlatformFocus.TrackFocusWithin(RepoList, "repos");
         PlatformFocus.TrackFocusWithin(UnstagedList, "changes");
 
+        // The view model asks; the page owns the dialogs. Using the system
+        // dialogs rather than custom ones means they are already keyboard
+        // accessible and already familiar to screen reader users.
+        _vm.PromptAsync = (title, message, initial) =>
+            DisplayPromptAsync(title, message, "OK", "Cancel", initialValue: initial);
+
+        _vm.ConfirmAsync = (title, message) =>
+            DisplayAlertAsync(title, message, "Yes", "No");
+
+        _vm.PickFolder = Services.FolderPicker.PickAsync;
+
         Announcer.Current.StatusChanged += (_, text) =>
             Dispatcher.Dispatch(() => StatusLabel.Text = text);
 

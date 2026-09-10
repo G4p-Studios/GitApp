@@ -9,7 +9,7 @@ namespace GitApp.Services;
 /// output. Git's normal output is localized and reformatted between versions;
 /// the porcelain formats are contracts. See docs/ARCHITECTURE.md 4.2.
 /// </summary>
-public sealed class GitService
+public sealed partial class GitService
 {
     private readonly GitProcess _git;
 
@@ -290,25 +290,6 @@ public sealed class GitService
         var remotes = result.Lines;
         return remotes.Contains("origin") ? "origin" : remotes.FirstOrDefault();
     }
-
-    public async Task<IReadOnlyList<string>> GetBranchesAsync(string repoPath, CancellationToken ct = default)
-    {
-        var result = await _git.RunAsync(
-            repoPath,
-            new[] { "for-each-ref", "--format=%(refname:short)", "refs/heads" },
-            ct);
-
-        return result.Success ? result.Lines : Array.Empty<string>();
-    }
-
-    public Task<GitResult> CheckoutAsync(string repoPath, string branch, CancellationToken ct = default) =>
-        _git.RunAsync(repoPath, new[] { "checkout", branch }, ct);
-
-    public Task<GitResult> CloneAsync(string url, string targetDirectory, CancellationToken ct = default) =>
-        _git.RunAsync(
-            Path.GetDirectoryName(targetDirectory) ?? Environment.CurrentDirectory,
-            new[] { "clone", url, targetDirectory },
-            ct);
 
     /// <summary>Recent commits on the current branch, newest first.</summary>
     public async Task<IReadOnlyList<CommitInfo>> GetLogAsync(
