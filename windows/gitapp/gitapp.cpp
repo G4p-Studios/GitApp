@@ -33,12 +33,14 @@ static bool IsSystemDarkTheme() noexcept {
 // Ask DWM to draw the standard title bar in its dark variant.
 //
 // Without this the window keeps a light title bar above a dark app, which is
-// the single most obvious way a Windows app looks unfinished. Using the DWM
-// attribute rather than custom title bar colours means we get exactly the
-// same title bar as every other Windows 11 app, including its hover and
-// inactive states.
-static void ApplyTitleBarTheme(winrt::Microsoft::UI::Windowing::AppWindow const &appWindow) noexcept {
-  auto hwnd{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id())};
+// the single most obvious way a Windows app looks unfinished.
+//
+// We use the DWM attribute rather than setting AppWindowTitleBar colours by
+// hand. Setting explicit colours, as react-native-gallery does, produces a
+// flat title bar that loses the system's own hover, pressed and inactive
+// shades; the DWM attribute gives the identical title bar that Settings and
+// the Store use, which is the goal.
+static void ApplyTitleBarTheme(HWND hwnd) noexcept {
   if (!hwnd) {
     return;
   }
@@ -47,6 +49,29 @@ static void ApplyTitleBarTheme(winrt::Microsoft::UI::Windowing::AppWindow const 
   // DWMWA_USE_IMMERSIVE_DARK_MODE. Ignored on builds that predate it, so
   // there is no version check to keep in sync.
   DwmSetWindowAttribute(hwnd, 20, &useDark, sizeof(useDark));
+}
+
+// Keep the title bar in step with the system theme for the lifetime of the
+// app, not just at startup.
+//
+// UISettings must outlive the registration or the subscription dies with it,
+// hence the static. ColorValuesChanged fires on a background thread, so the
+// update is marshalled back to the UI thread before touching the window.
+static void WatchSystemTheme(HWND hwnd) noexcept {
+  static winrt::Windows::UI::ViewManagement::UISettings s_uiSettings;
+
+  try {
+    auto dispatcherQueue{winrt::Microsoft::UI::Dispatching::DispatcherQueue::GetForCurrentThread()};
+
+    s_uiSettings.ColorValuesChanged([hwnd, dispatcherQueue](auto const &, auto const &) {
+      if (dispatcherQueue) {
+        dispatcherQueue.TryEnqueue([hwnd]() { ApplyTitleBarTheme(hwnd); });
+      }
+    });
+  } catch (...) {
+    // A missing dispatcher queue only costs us live updates, not correctness
+    // at startup. Not worth failing the app over.
+  }
 }
 
 // A PackageProvider containing any turbo modules you define within this app project
@@ -113,7 +138,12 @@ _Use_decl_annotations_ int CALLBACK WinMain(HINSTANCE instance, HINSTANCE, PSTR 
   auto appWindow{reactNativeWin32App.AppWindow()};
   appWindow.Title(L"GitApp");
   appWindow.Resize({1000, 1000});
-  ApplyTitleBarTheme(appWindow);
+
+  // Title bar theming. The title bar is drawn by DWM rather than by Fabric,
+  // so it does not follow the JS theme and has to be handled here.
+  auto hwnd{winrt::Microsoft::UI::GetWindowFromWindowId(appWindow.Id())};
+  ApplyTitleBarTheme(hwnd);
+  WatchSystemTheme(hwnd);
 
   // Get the ReactViewOptions so we can set the initial RN component to load
   auto viewOptions{reactNativeWin32App.ReactViewOptions()};

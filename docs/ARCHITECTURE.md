@@ -232,20 +232,30 @@ is worse than either one.
 
 Accessibility is verified by tests, not by intention.
 
-1. **UIA tree snapshots.** RNW's test infrastructure can dump the composition
-   accessibility tree. Every primitive and every screen has a committed snapshot
-   asserting control type, name, patterns, and set positions. A diff in that
-   snapshot is a review conversation.
-2. **Keyboard reachability tests.** For each screen, assert that every
+1. **Prop-level tree snapshots**, in `tests/a11y/`. These run under Jest and
+   assert the accessibility props we declare: control type, name, description,
+   set positions, and the single-tab-stop invariant. Fast, they gate CI, and
+   they catch most regressions. They are not a UIA dump, and they say so.
+2. **Live UIA snapshots**, against the running app. `microsoft/react-native-gallery`
+   solves this with a C# test project that drives the deployed app through
+   `System.Windows.Automation` and scans it with **Axe.Windows**, the engine
+   behind Accessibility Insights, writing a committed JSON snapshot. That is
+   the model to copy: it is the only way to see what a screen reader actually
+   sees, including what Fabric decides not to put in the tree.
+
+   Not yet built here, and the gap is not theoretical. Two bugs in the first
+   shell were invisible to every prop-level test and to the type checker, and
+   surfaced only on reading the live tree: `accessible={false}` on a container
+   deleted both panes from the UIA tree, and a missing `accessible` removed
+   the status bar and its live region. Both files read as correct.
+3. **Keyboard reachability tests.** For each screen, assert that every
    interactive element is reachable by Tab and arrow keys from the pane root, and
    that every mouse action has a context-menu equivalent.
-3. **Manual screen reader pass.** NVDA and Narrator, both, before any feature is
+4. **Manual screen reader pass.** NVDA and Narrator, both, before any feature is
    called done. JAWS before each release. A per-screen checklist lives beside
    the screen's code.
-4. **Accessibility Insights for Windows** on each build, for tree and property
-   hygiene.
 
-CI gates on items 1 and 2. Items 3 and 4 gate the release.
+CI gates on items 1 and 3. Items 2 and 4 gate the release.
 
 ### 3.8 Theming, dark mode and high contrast
 
@@ -429,7 +439,8 @@ list underneath the user's cursor.
 - `src/theme/` — design tokens derived from github.com, for light, dark and high contrast.
 - `windows/` — C++/WinRT native modules and the RNW app project.
 - `docs/` — this file and its successors.
-- `tests/a11y/` — UIA tree snapshots and keyboard reachability tests.
+- `tests/a11y/` — prop-level accessibility snapshots, the theme-discipline
+  check, and keyboard reachability tests.
 - `tests/services/` — Git porcelain parsing fixtures and API contract tests.
 
 High contrast is a first-class theme rather than an afterthought: it is one of
