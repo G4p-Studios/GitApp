@@ -99,6 +99,53 @@ one; do not add more without verifying against the provider source.
 | WinUI Fluent brush names resolve to hardcoded light-theme values (upstream issue 11489) | `PlatformColor('TextFillColorPrimary')` and the rest of the Fluent palette return light colours in every theme, so the obvious modern choice fails in dark mode exactly like a hex literal. | Use only the `UIColorType` and `UIElementType` names, which are theme and high-contrast aware. See 3.8. A custom resource loader is the eventual route to real Fluent colours. |
 | "Advanced Screen Reader Readability", upstream issue 11901, still open | Parts of N-of-M, HelpText, Description and Value handling are still in flux. | Pin the RNW version. Every upgrade runs the screen reader regression suite (section 3.7) before merge. |
 
+### 2.3a The window activation announcement is gone on Fabric
+
+Legacy RNW apps announce themselves to a screen reader the way Settings and
+the Store do. Fabric apps do not. This was measured, not inferred, by running
+three apps side by side with NVDA's Speech Viewer and reading the transcript
+out of its edit control.
+
+| App | Architecture | Win32 class | NVDA on activation |
+| --- | --- | --- | --- |
+| React Native Gallery (Legacy) | Paper, UWP | `ApplicationFrameWindow`, hosted by ApplicationFrameHost | "React Native Gallery (Legacy)" / "React Native Gallery (Legacy) **window**" / "Navigation bar **button**" |
+| React Native Gallery | Fabric, Win32 | `Microsoft.UI.Windowing.Window` | "React Native Gallery" |
+| GitApp | Fabric, Win32 | `Microsoft.UI.Windowing.Window` | "GitApp" |
+
+Two things are lost, and the second matters far more than the first:
+
+1. The word "window" after the title.
+2. **The focused control is not announced at all.** The legacy app names the
+   control focus landed on; the Fabric apps name only the window.
+
+The cause is the window itself. A legacy RNW app was a UWP app, so its window
+was an `ApplicationFrameWindow` owned by ApplicationFrameHost, which NVDA has
+long-standing handling for. A Fabric app is a plain Win32 app whose window is
+`Microsoft.UI.Windowing.Window`. Every other property is identical between the
+two Fabric apps and ours: same class, same style `0x15CF0000`, same exstyle,
+same UIA `ControlType.Window`, same `LocalizedControlType` of "window", same
+`FrameworkId`. There is nothing to fix in our code, and nothing distinguishes
+GitApp from Microsoft's own current sample.
+
+This is not a general failure of screen reader support. Once focus is inside
+the app, NVDA reads our tree correctly: tabbing to a button announces
+"Fetch button, Downloads new commits without changing your working tree, F",
+which is the label, the hint and the access key. Only the activation moment is
+affected.
+
+Options, in order of preference:
+
+- **Report it upstream.** No matching issue exists on
+  microsoft/react-native-windows. It affects every Fabric app, including
+  Microsoft's own, so it is worth filing with the evidence above.
+- **Work around the second symptom.** Re-asserting focus when the window is
+  activated fires a UIA focus change, which NVDA does announce. That needs a
+  native window-activation event surfaced to JS, since RNW's AppState only
+  reports deactivation behind a quirk setting inherited from the UWP era.
+  `FocusManager` already tracks the target to restore.
+- **Accept the first symptom.** The missing word "window" follows from the
+  window class, and short of shipping as a UWP app there is nothing to change.
+
 ### 2.4 Honest risk statement
 
 RNW gives us a competent UIA substrate and a real escape hatch, but a large
