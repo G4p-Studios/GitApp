@@ -2,16 +2,20 @@
  * Milestone 1 shell.
  *
  * This screen exists to prove the accessibility substrate before any feature
- * depends on it: three panes cycled with F6, a list with roving focus and
- * honest set counts, announcements, and a single status live region.
+ * depends on it: panes cycled with F6, a list with roving focus and honest
+ * set counts, announcements, and a single status live region.
  *
  * The data is placeholder. The interaction model is not.
+ *
+ * Every colour comes from src/theme. See the note there on why the Fluent
+ * brush names are unsafe under Fabric.
  */
 
-import React, {useCallback, useState} from 'react';
+import React, {useCallback, useMemo, useState} from 'react';
 import {StyleSheet, Text, View} from 'react-native';
 
 import {Announcer, Button, List, Pane, PaneHost, StatusLine} from './a11y';
+import {metrics, space, type, useTheme, type Palette} from './theme';
 
 type Repo = {
   id: string;
@@ -46,6 +50,8 @@ function describeSync(repo: Repo): string {
 
 export default function App() {
   const [selected, setSelected] = useState<Repo>(REPOS[0]);
+  const {color} = useTheme();
+  const styles = useMemo(() => makeStyles(color), [color]);
 
   const onFetch = useCallback(() => {
     // The operation() pairing is mandatory for anything that can outlast a
@@ -78,10 +84,17 @@ export default function App() {
                 setSelected(repo);
                 Announcer.announce(`Opened ${repo.name}`);
               }}
+              // Without flex the list is zero-height inside a column pane and
+              // renders nothing at all.
+              style={styles.list}
               renderItem={(repo, _index, isActive) => (
-                <View style={[styles.row, isActive && styles.rowActive]}>
-                  <Text style={styles.rowName}>{repo.name}</Text>
-                  <Text style={styles.rowMeta}>
+                <View style={styles.row}>
+                  <Text
+                    style={[styles.rowName, isActive && styles.rowTextSelected]}>
+                    {repo.name}
+                  </Text>
+                  <Text
+                    style={[styles.rowMeta, isActive && styles.rowTextSelected]}>
                     {repo.branch} &middot; {describeSync(repo)}
                   </Text>
                 </View>
@@ -103,19 +116,16 @@ export default function App() {
                 hint="Downloads new commits without changing your working tree"
                 onPress={onFetch}
                 accessKey="F"
-                style={styles.button}
               />
               <Button
                 label="Pull"
                 onPress={() => Announcer.announce('Pull is not implemented yet')}
                 accessKey="P"
-                style={styles.button}
               />
               <Button
                 label="Push"
                 onPress={() => Announcer.announce('Push is not implemented yet')}
                 accessKey="U"
-                style={styles.button}
               />
             </View>
           </Pane>
@@ -127,37 +137,45 @@ export default function App() {
   );
 }
 
-const styles = StyleSheet.create({
-  window: {flex: 1, backgroundColor: '#ffffff'},
+const makeStyles = (color: Palette) =>
+  StyleSheet.create({
+  window: {flex: 1, backgroundColor: color.background},
   body: {flex: 1, flexDirection: 'row'},
   sidebar: {
-    width: 280,
-    borderRightWidth: 1,
-    borderRightColor: '#d0d7de',
-    padding: 12,
+    width: metrics.sidebarWidth,
+    borderRightWidth: metrics.borderWidth,
+    borderRightColor: color.borderSubtle,
+    paddingVertical: space.sm,
+    paddingHorizontal: space.sm,
   },
-  main: {flex: 1, padding: 20},
-  paneHeading: {fontSize: 13, fontWeight: '600', marginBottom: 8, color: '#57606a'},
-  heading: {fontSize: 24, fontWeight: '600', marginBottom: 4},
-  meta: {fontSize: 14, color: '#57606a', marginBottom: 20},
-  row: {paddingVertical: 6, paddingHorizontal: 8, borderRadius: 4},
-  rowActive: {backgroundColor: '#ddf4ff'},
-  rowName: {fontSize: 14, fontWeight: '500'},
-  rowMeta: {fontSize: 12, color: '#57606a'},
-  actions: {flexDirection: 'row', gap: 8},
-  button: {
-    paddingVertical: 6,
-    paddingHorizontal: 14,
-    borderWidth: 1,
-    borderColor: '#d0d7de',
-    borderRadius: 6,
-    backgroundColor: '#f6f8fa',
+  list: {flex: 1},
+  main: {flex: 1, padding: space.xxl},
+  paneHeading: {
+    ...type.caption,
+    fontWeight: '600',
+    color: color.textSecondary,
+    marginBottom: space.xs,
+    paddingHorizontal: space.xs,
   },
+  heading: {...type.title, color: color.text, marginBottom: space.xs},
+  meta: {...type.body, color: color.textSecondary, marginBottom: space.xl},
+  row: {
+    paddingVertical: space.xs,
+    paddingHorizontal: space.sm,
+    justifyContent: 'center',
+  },
+  rowName: {...type.body, color: color.text},
+  rowMeta: {...type.caption, color: color.textSecondary},
+  // Selected rows use the system Highlight pair. Both halves must change
+  // together or high contrast themes produce unreadable rows.
+  rowTextSelected: {color: color.selectedText},
+  actions: {flexDirection: 'row', gap: space.sm},
   status: {
-    borderTopWidth: 1,
-    borderTopColor: '#d0d7de',
-    paddingVertical: 4,
-    paddingHorizontal: 12,
+    borderTopWidth: metrics.borderWidth,
+    borderTopColor: color.borderSubtle,
+    paddingVertical: space.xs,
+    paddingHorizontal: space.md,
     minHeight: 24,
+    justifyContent: 'center',
   },
-});
+  });

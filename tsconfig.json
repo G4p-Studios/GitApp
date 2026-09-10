@@ -1,7 +1,7 @@
 {
   "extends": "@react-native/typescript-config",
   "compilerOptions": {
-    "types": ["jest"],
+    "types": ["jest", "node"],
     // Resolve `react-native` to the Windows type surface. RNW re-exports all
     // of core plus the Windows-only props this app depends on: onKeyDown,
     // keyDownEvents, tabIndex, accessibilityPosInSet, accessibilitySetSize,

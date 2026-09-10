@@ -8,15 +8,18 @@
  * See docs/ARCHITECTURE.md section 3.1.
  */
 
-import React, {forwardRef, useCallback} from 'react';
+import React, {forwardRef, useCallback, useMemo, useState} from 'react';
 import {
   Pressable,
+  StyleSheet,
   Text,
   type StyleProp,
   type ViewStyle,
 } from 'react-native';
 
 import {chord, matches} from '../keys';
+import type {Palette} from '../../theme';
+import {metrics, radius, space, type as typeScale, useTheme} from '../../theme';
 
 const SPACE = chord('Space');
 const ENTER = chord('Enter');
@@ -50,6 +53,11 @@ export const Button = forwardRef<React.ComponentRef<typeof Pressable>, ButtonPro
     {label, description, hint, onPress, disabled, busy, accessKey, style, children},
     ref,
   ) {
+    const {color} = useTheme();
+    const [focused, setFocused] = useState(false);
+
+    const styles = useMemo(() => makeStyles(color), [color]);
+
     // Fabric fires onClick for pointer input, but keyboard activation of a
     // generic View is not automatic. Handle both keys explicitly.
     const onKeyDown = useCallback(
@@ -67,7 +75,18 @@ export const Button = forwardRef<React.ComponentRef<typeof Pressable>, ButtonPro
     return (
       <Pressable
         ref={ref}
-        style={style}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        style={[
+          styles.button,
+          disabled && styles.disabled,
+          // A visible focus indicator is not decoration. RNW 0.84 shows system
+          // focus visuals for keyboard input only, but the default ring is
+          // easy to lose against a themed surface, so draw our own in the
+          // user's accent colour.
+          focused && styles.focused,
+          style,
+        ]}
         onPress={disabled ? undefined : onPress}
         onKeyDown={onKeyDown}
         keyDownEvents={[
@@ -83,8 +102,38 @@ export const Button = forwardRef<React.ComponentRef<typeof Pressable>, ButtonPro
         accessibilityHint={hint}
         accessibilityAccessKey={accessKey}
         accessibilityState={{disabled: !!disabled, busy: !!busy}}>
-        {children ?? <Text>{label}</Text>}
+        {children ?? (
+          <Text style={[styles.label, disabled && styles.labelDisabled]}>
+            {label}
+          </Text>
+        )}
       </Pressable>
     );
   },
 );
+
+const makeStyles = (color: Palette) =>
+  StyleSheet.create({
+  button: {
+    minHeight: metrics.controlHeight,
+    paddingHorizontal: space.md,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: color.surface,
+    borderWidth: metrics.borderWidth,
+    borderColor: color.border,
+    borderRadius: radius.control,
+  },
+  focused: {
+    borderColor: color.accent,
+    borderWidth: metrics.focusRingWidth,
+    // Keep the control the same size when the ring thickens, so a row of
+    // buttons does not shift as focus moves through it.
+    paddingHorizontal: space.md - (metrics.focusRingWidth - metrics.borderWidth),
+  },
+  disabled: {
+    borderColor: color.borderSubtle,
+  },
+  label: {...typeScale.body, color: color.textOnSurface},
+  labelDisabled: {color: color.disabled},
+  });

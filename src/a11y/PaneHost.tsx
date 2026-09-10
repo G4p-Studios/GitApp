@@ -25,6 +25,8 @@ import {
   type ViewStyle,
 } from 'react-native';
 
+import {type, useTheme} from '../theme';
+
 import {Announcer} from './Announcer';
 import {FocusManager, type PaneId} from './FocusManager';
 import {KeyMap, chord} from './keys';
@@ -135,7 +137,13 @@ export function Pane({id, name, order, style, children}: PaneProps) {
       <View
         ref={ref}
         style={style}
-        accessible={false}
+        // Must be true. Fabric gates both IsControlElement and
+        // IsContentElement on `props->accessible`, so accessible={false}
+        // deletes the pane from the UIA tree entirely and its children
+        // collapse into the nearest ancestor. Unlike some platforms, marking a
+        // container accessible on Fabric does not make it a leaf: children
+        // remain individually reachable.
+        accessible
         accessibilityRole={PANE_ROLE}
         accessibilityLabel={name}
         // Focusable so the pane itself can receive focus when it has no
@@ -159,6 +167,7 @@ export function Pane({id, name, order, style, children}: PaneProps) {
  */
 export function StatusLine({style}: {style?: StyleProp<ViewStyle>}) {
   const [status, setStatus] = React.useState(() => Announcer.getStatus());
+  const {color} = useTheme();
 
   useEffect(
     () => Announcer.subscribeToStatus((text, urgency) => setStatus({text, urgency})),
@@ -168,6 +177,9 @@ export function StatusLine({style}: {style?: StyleProp<ViewStyle>}) {
   return (
     <View
       style={style}
+      // Same gate as Pane: without `accessible` the status bar is absent from
+      // the UIA tree and the live region never fires.
+      accessible
       // `role="status"` rather than accessibilityRole: the two go through
       // different native paths, and only the role enum maps to
       // UIA_StatusBarControlTypeId. accessibilityRole has no "statusbar" case
@@ -175,7 +187,8 @@ export function StatusLine({style}: {style?: StyleProp<ViewStyle>}) {
       role="status"
       accessibilityLabel="Status"
       accessibilityLiveRegion={status.text ? status.urgency : 'none'}>
-      <Text>{status.text}</Text>
+      <Text style={[type.body, {color: color.textSecondary}]}>{status.text}</Text>
     </View>
   );
 }
+

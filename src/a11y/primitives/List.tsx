@@ -25,6 +25,7 @@ import React, {
 import {
   FlatList,
   Pressable,
+  StyleSheet,
   Text,
   View,
   type StyleProp,
@@ -33,6 +34,7 @@ import {
 
 import {usePane} from '../PaneHost';
 import {KeyMap, chord} from '../keys';
+import {radius, space, type as typeScale, useTheme, type Palette} from '../../theme';
 
 /** Type-to-select buffer resets after this long without a keystroke. */
 const TYPEAHEAD_RESET_MS = 1000;
@@ -103,6 +105,8 @@ export function List<T>({
   const listRef = useRef<FlatList<T>>(null);
   const typeahead = useRef({buffer: '', at: 0});
   const pane = usePane();
+  const {color} = useTheme();
+  const styles = useMemo(() => makeStyles(color), [color]);
 
   const setSize = totalCount ?? items.length;
 
@@ -183,11 +187,11 @@ export function List<T>({
   if (items.length === 0) {
     return (
       <View
-        style={style}
+        style={[styles.empty, style]}
         accessible
         accessibilityRole="list"
         accessibilityLabel={`${label}, empty`}>
-        <Text>{emptyMessage}</Text>
+        <Text style={styles.emptyText}>{emptyMessage}</Text>
       </View>
     );
   }
@@ -233,6 +237,10 @@ export function List<T>({
             }}
             onKeyDown={onKeyDown}
             keyDownEvents={handledKeys}
+            // The system Highlight pair, so selection stays legible under a
+            // high contrast theme. Callers style the row content; the
+            // selection surface belongs to the primitive.
+            style={[styles.row, isActive && styles.rowSelected]}
             // Roving tabindex: exactly one row is in the Tab order, so the
             // list is a single tab stop and arrows move within it.
             focusable
@@ -251,3 +259,15 @@ export function List<T>({
     />
   );
 }
+
+const makeStyles = (color: Palette) =>
+  StyleSheet.create({
+  row: {
+    borderRadius: radius.control,
+    marginHorizontal: space.xs,
+    marginVertical: 1,
+  },
+  rowSelected: {backgroundColor: color.selected},
+  empty: {padding: space.md},
+  emptyText: {...typeScale.body, color: color.textSecondary},
+  });

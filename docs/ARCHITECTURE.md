@@ -96,6 +96,7 @@ one; do not add more without verifying against the provider source.
 | No `IWindowProvider`, no native menu bar | Dialogs are not natively modal and menus are not native menus. | Dialogs use `accessibilityViewIsModal` plus a manual focus trap. The menu bar is hand-built on the menubar, menu and menuitem control types with ExpandCollapse and Invoke. |
 | UIA ItemStatus is hardcoded to `Busy` or empty, from `accessibilityState.busy` alone | No arbitrary per-item status text, so "syncing", "3 conflicts ahead" and similar cannot ride on the item itself. | Use `accessibilityState.busy` for the binary case, `accessibilityValue.text` where the control has a real value, and otherwise a live region. See 3.3. |
 | `accessibilityRole` and `role` resolve through two different native functions with different coverage | Neither prop is a superset. `accessibilityRole` handles `pane`, `tree` and `treeitem`, which `role` lacks; `role` reaches `status` (UIA StatusBar), `table` and `application`, which `accessibilityRole` lacks. An unmatched `accessibilityRole` silently degrades to a Group. | Pick per control against the table in 2.2a, and never assume the two are interchangeable. The remaining `aria-*` aliases are still incomplete (upstream issue 11905, open), so use `accessibility*` props for everything except the roles listed as role-only. |
+| WinUI Fluent brush names resolve to hardcoded light-theme values (upstream issue 11489) | `PlatformColor('TextFillColorPrimary')` and the rest of the Fluent palette return light colours in every theme, so the obvious modern choice fails in dark mode exactly like a hex literal. | Use only the `UIColorType` and `UIElementType` names, which are theme and high-contrast aware. See 3.8. A custom resource loader is the eventual route to real Fluent colours. |
 | "Advanced Screen Reader Readability", upstream issue 11901, still open | Parts of N-of-M, HelpText, Description and Value handling are still in flux. | Pin the RNW version. Every upgrade runs the screen reader regression suite (section 3.7) before merge. |
 
 ### 2.4 Honest risk statement
@@ -245,6 +246,73 @@ Accessibility is verified by tests, not by intention.
    hygiene.
 
 CI gates on items 1 and 2. Items 3 and 4 gate the release.
+
+### 3.8 Theming, dark mode and high contrast
+
+Colour is an accessibility concern here, not a cosmetic one, and Fabric has a
+trap in it that is worth stating precisely.
+
+RNW 0.84 made `Text` colour theme-aware by default. Any hardcoded background
+therefore breaks in the opposite theme: a white background plus a theme-aware
+foreground is white-on-white in dark mode, which renders as a blank window with
+no error anywhere. That is not a hypothetical; it is how the first shell
+shipped.
+
+**Every colour in the app is a `PlatformColor` from `src/theme`. No hex
+literals.** A test enforces this (`tests/a11y/noHardcodedColors.test.ts`),
+because the failure is invisible in whichever theme the developer happens to be
+using.
+
+Which platform colour names are safe is the non-obvious part. Fabric's
+`Theme::TryGetPlatformColor` resolves in four tiers:
+
+1. An app-registered custom resource loader.
+2. `UISettings.GetColorValue(UIColorType)` — theme aware. `Accent`,
+   `Background`, `Foreground`.
+3. `UISettings.UIElementColor(UIElementType)` — theme aware **and high
+   contrast aware**, because the system returns the active HC palette.
+   `Window`, `WindowText`, `ButtonFace`, `ButtonText`, `Highlight`,
+   `HighlightText`, `GrayText`, `Hotlight`, and the rest of the classic set.
+4. WinUI Fluent brush names, aliased to a table of **hardcoded light-theme
+   values** (upstream issue 11489).
+
+Tier 4 is the trap, and it is the tier that looks correct.
+`TextFillColorPrimary`, `ControlFillColorDefault` and `SolidBackgroundFillColorBase`
+are exactly what a WinUI XAML app would use, and under Fabric they return light
+values in every theme.
+
+The conclusion, verified by running the app rather than by reading the table:
+**no `PlatformColor` name returns dark-theme values.** Tier 4 is hardcoded
+light, and the tier 3 `UIElementType` names are the classic Win32 system
+colours, which track high contrast but not the Windows 11 light/dark setting.
+An app built entirely on platform colours is therefore permanently light.
+
+So GitApp uses three palettes, selected by `useTheme()`:
+
+- **High contrast** is entirely tier 2 and 3 platform colours. Under a high
+  contrast theme the user has chosen those colours and the app must obey them.
+  This palette takes priority over everything, including an explicit light or
+  dark preference.
+- **Light** and **dark** are Fluent's own values, written out in
+  `src/theme/palette.ts` and selected with `useColorScheme()`. That file is the
+  one place in the app allowed to name a colour, and a test enforces it.
+- The accent is `PlatformColor('Accent')` in all three, since tier 2 resolves
+  it correctly in every theme.
+
+Selection always uses a pair, `selected` with `selectedText`. High contrast
+redefines both, and using one with a colour of our own produces unreadable
+rows.
+
+The native title bar is separate from all of this: it is drawn by DWM, not by
+Fabric, so it needs `DWMWA_USE_IMMERSIVE_DARK_MODE` set on the window handle at
+startup. Without it a dark app keeps a light title bar, which is the most
+visible way a Windows app looks unfinished. `windows/gitapp/gitapp.cpp` does
+this from the same UISettings signal the JS theme uses, so the two cannot
+disagree.
+
+Replacing the literals with real Fluent resources means registering a custom
+resource loader natively, at tier 1. That is a reasonable later project and is
+not worth blocking feature work on.
 
 ## 4. System architecture
 

@@ -11,20 +11,22 @@ import {AccessibilityInfo} from 'react-native';
 
 import {Announcer} from '../../src/a11y';
 
-jest.mock('react-native', () => ({
-  AccessibilityInfo: {announceForAccessibility: jest.fn()},
-}));
-
-const spoken = AccessibilityInfo.announceForAccessibility as jest.Mock;
+// Spy on the one method rather than replacing the whole module. A module mock
+// here silently strips everything else react-native exports, and the theme
+// layer needs PlatformColor at import time.
+let spoken: jest.SpyInstance;
 
 describe('Announcer', () => {
   beforeEach(() => {
     jest.useFakeTimers();
-    spoken.mockClear();
+    spoken = jest
+      .spyOn(AccessibilityInfo, 'announceForAccessibility')
+      .mockImplementation(() => {});
     Announcer.reset();
   });
 
   afterEach(() => {
+    spoken.mockRestore();
     jest.useRealTimers();
   });
 
