@@ -26,7 +26,7 @@ npx react-native run-windows --arch x64
 
 ## Known environment traps
 
-Three things cost time on first setup. All three fail in ways that do not point
+Four things cost time on first setup. All four fail in ways that do not point
 at the cause.
 
 ### The Windows SDK is pinned, deliberately
@@ -70,7 +70,7 @@ DeployRecipeFailure: Deploying ...\gitapp.Package.build.appxrecipe - exit error 
 ```
 
 Code 5 is ACCESS_DENIED, and it means Developer Mode is off. The compile
-succeeds and produces `windowsd\Debug\gitapp.exe`; only registering the
+succeeds and produces `windows\x64\Debug\gitapp.exe`; only registering the
 app package fails, which is why the error arrives at the very end of a long
 build and looks worse than it is.
 
