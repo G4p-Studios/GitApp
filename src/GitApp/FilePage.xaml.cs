@@ -29,6 +29,7 @@ public partial class FilePage : ContentPage
         PlatformFocus.TrackFocusWithin(LineList, "file-contents");
         PlatformFocus.DescribeEmptyView(LineList, "This file is empty");
 
+        FileDocument.LinkActivated += OnLink;
         _vm.ContentsChanged += (_, _) => Dispatcher.Dispatch(Render);
     }
 
@@ -83,26 +84,14 @@ public partial class FilePage : ContentPage
 
     private void Render()
     {
-        DocumentHost.Children.Clear();
         AboutFactsHost.Children.Clear();
 
         if (_vm.ShowDocument)
         {
-            if (_vm.BodyBlocks.Count == 0)
-            {
-                var empty = new Label
-                {
-                    Text = "This file is empty.",
-                    FontSize = 14,
-                    Opacity = 0.7,
-                };
-                SemanticProperties.SetDescription(empty, "This file is empty.");
-                DocumentHost.Children.Add(empty);
-            }
-            else
-            {
-                MarkdownRenderer.AddBlocks(DocumentHost, _vm.BodyBlocks, OnLink, headingOffset: 1);
-            }
+            FileDocument.Title = _vm.Title;
+            FileDocument.HeadingOffset = 1;
+            FileDocument.BaseUri = _vm.DocumentBaseUri;
+            FileDocument.Blocks = _vm.BodyBlocks;
         }
 
         foreach (var fact in _vm.AboutFacts)
@@ -112,9 +101,15 @@ public partial class FilePage : ContentPage
             AboutFactsHost.Children.Add(label);
         }
 
-        FilePane.EntryControl = _vm.ShowUnavailable ? UnavailableLabel : TitleLabel;
+        FilePane.EntryControl = _vm.ShowUnavailable
+            ? UnavailableLabel
+            : _vm.ShowDocument
+                ? FileDocument
+                : _vm.ShowLines
+                    ? LineList
+                    : TitleLabel;
     }
 
-    private async void OnLink(object? sender, EventArgs e) =>
-        await MarkdownRenderer.OpenLinkAsync(sender);
+    private async void OnLink(object? sender, string url) =>
+        await MarkdownRenderer.OpenLinkAsync(url);
 }

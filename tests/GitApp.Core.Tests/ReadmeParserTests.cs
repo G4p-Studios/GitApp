@@ -37,16 +37,46 @@ public class ReadmeParserTests
     }
 
     [Fact]
-    public void LinksAreLiftedOutSoTheyCanBeRealControls()
+    public void LinksStayInTheSentenceAsSpans()
     {
         var blocks = ReadmeDocument.Parse("See the [contributing guide](https://example.com/contributing) for details.");
 
         var paragraph = Assert.Single(blocks);
         Assert.Equal("See the contributing guide for details.", paragraph.Text);
-        var link = Assert.Single(paragraph.Links);
-        Assert.Equal("contributing guide", link.Text);
+        Assert.Equal(3, paragraph.Spans.Count);
+        Assert.Equal("See the ", paragraph.Spans[0].Text);
+        Assert.False(paragraph.Spans[0].IsLink);
+        Assert.Equal("contributing guide", paragraph.Spans[1].Text);
+        Assert.Equal("https://example.com/contributing", paragraph.Spans[1].Url);
+        Assert.Equal(" for details.", paragraph.Spans[2].Text);
+    }
+
+    [Fact]
+    public void DocumentLayoutKeepsALinkInsideItsSentence()
+    {
+        var blocks = ReadmeDocument.Parse("See the [contributing guide](https://example.com/contributing) for details.");
+        var layout = MarkdownDocument.Layout(blocks, title: "README.md");
+
+        Assert.StartsWith("README.md", layout.Text);
+        Assert.Contains("See the contributing guide for details.", layout.Text);
+
+        var link = Assert.Single(layout.Ranges, r => r.Kind == MarkdownRangeKind.Link);
+        Assert.Equal("contributing guide", layout.Text.Substring(link.Start, link.Length));
         Assert.Equal("https://example.com/contributing", link.Url);
-        Assert.Equal("contributing guide, link", link.AccessibleName);
+
+        var heading = Assert.Single(layout.Ranges, r => r.Kind == MarkdownRangeKind.Heading && r.Level == 1);
+        Assert.Equal("README.md", layout.Text.Substring(heading.Start, heading.Length));
+    }
+
+    [Fact]
+    public void RelativeUrlsResolveAgainstTheFileTheyCameFrom()
+    {
+        Assert.Equal(
+            "https://example.com/contributing",
+            MarkdownDocument.ResolveUrl("https://example.com/contributing", "https://github.com/a/b/blob/main/"));
+        Assert.Equal(
+            "https://github.com/a/b/blob/main/docs/guide.md",
+            MarkdownDocument.ResolveUrl("docs/guide.md", "https://github.com/a/b/blob/main/"));
     }
 
     [Fact]

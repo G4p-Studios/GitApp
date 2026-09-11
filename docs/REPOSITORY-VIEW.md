@@ -78,8 +78,8 @@ Three panes, cycled with F6 (`ARCHITECTURE.md` 3.4):
   commit, file table. Enter or Space opens a folder or a file; Left goes
   up one folder; Escape goes up, and at the root returns to the
   repository list.
-- **Readme** — the rendered README as a document, not a list. Headings
-  expose `HeadingLevel` so a screen reader can jump by heading.
+- **Readme** — the README as one native document. Arrow keys move a
+  caret line by line; links stay in the sentence they belong to.
 - **About** — one control per fact.
 
 The latest-commit line sits at the top of the Files pane rather than in its
@@ -99,11 +99,11 @@ you were in.
 Two panes: **File** then **About**. Escape returns to the file table.
 
 - **Markdown** (`.md`, `.markdown`, `.mdown`, `.mdwn`) is the same native
-  document as the README: headings jumpable, links as buttons, a code
-  block one label. File headings are shifted down one level so they
-  cannot outrank the filename. Showing source instead would give up
-  heading jump, which is the reason Markdown is rendered at all. The
-  source remains on github.com, via the toolbar button.
+  document as the README: arrow keys move a caret, links sit in the
+  sentence as hyperlinks, Enter on a link opens it. File headings are
+  shifted down one level so they cannot outrank the filename. Showing
+  source instead would give up that reading model. The source remains on
+  github.com, via the toolbar button.
 - **Other text** is a line list, Consolas, with the line number in a
   gutter the way the diff viewer is. Each row announces content first,
   line number last: `return false;, line 15`. Leading with the number
@@ -128,22 +128,34 @@ is not here; it is unsolved in the diff viewer too.
 Hosting github.com in a WebView2 would give up the premise: the
 announcements would be GitHub's, the keyboard model would be the browser's,
 F6 would do nothing, and every accessibility decision in this document
-would belong to someone else.
+would belong to someone else. WebView2 is an HWND island, so the page's
+preview-key hook never sees F6 while it has focus.
 
-The README is parsed in `GitApp.Core` into headings, paragraphs, lists and
-fenced code, then rendered as native labels. That parser is not CommonMark;
-it covers the shapes that carry accessibility meaning and leaves the rest
-as text rather than guessing it into the wrong role.
+A stack of labels is not a document either. Labels are not in the tab
+order, arrow keys cannot move a caret through them, and the only
+focusable things were the links, which had been pulled out of their
+sentences and rendered as buttons. A listen-through found both of those
+at once: you could not read the README with the arrow keys, and every
+link said "button".
 
-- Headings get `SemanticProperties.HeadingLevel`. That is the whole reason
-  for rendering Markdown at all.
-- A fenced code block is **one** label, summarised as "Code block, csharp,
-  12 lines" and then the code. One element per character would spell
+So the README is one read-only RichEditBox, the same caret-reading shape
+as Notepad. It lives in the XAML tree, so F6 still cycles panes. The
+parser in `GitApp.Core` is not CommonMark; it covers the shapes that
+carry meaning and leaves the rest as text rather than guessing it into
+the wrong role.
+
+- Arrow keys move the caret and read line by line. That is the whole
+  reason this is a document control rather than labels.
+- Links stay in the sentence as hyperlinks (`ITextRange.Link`), not
+  buttons after the paragraph. The name is the visible text; the control
+  type is already "link". Enter on the caret opens the destination.
+- A fenced code block is one run, summarised as "Code block, csharp, 2
+  lines" and then the code. One element per character would spell
   punctuation aloud.
-- Links are lifted out of the paragraph and rendered as buttons, because
-  MAUI has no portable hyperlink control. NVDA's link list will not find
-  them; the button list will. The paragraph itself keeps the visible text
-  without the URL, so the destination is not spelled inside the sentence.
+- Headings are bold and larger in the same document. They are no longer
+  separate UIA heading elements, because that was the label stack that
+  could not be read. Heading jump in browse mode is the remaining
+  question; being able to read the file is not.
 
 ## GraphQL, in two requests, shown as one
 
@@ -161,7 +173,8 @@ arrived, for the same reason: a half-annotated list is still a list.
 
 ## What is not verified
 
-The repository screen itself has been opened against a real account. The
-file view's parsing, line wording, size wording, and the binary / too-
-large / missing-blob cases are covered by unit tests against recorded
-GraphQL. It has not yet been listened through on a live token.
+The repository screen itself has been opened against a real account; that
+is how the label-stack README was found. The document control's parsing
+and link ranges are unit tested. It has not yet been listened through:
+caret reading, Enter on a link, and F6 out of the README. The file view
+has the same gap.

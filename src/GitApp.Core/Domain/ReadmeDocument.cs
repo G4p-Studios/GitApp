@@ -24,9 +24,10 @@ public sealed record ReadmeBlock(
     string Text,
     int Level = 0,
     string? Language = null,
-    IReadOnlyList<ReadmeLink>? Links = null)
+    IReadOnlyList<ReadmeSpan>? Spans = null)
 {
-    public IReadOnlyList<ReadmeLink> Links { get; } = Links ?? Array.Empty<ReadmeLink>();
+    public IReadOnlyList<ReadmeSpan> Spans { get; } =
+        Spans is { Count: > 0 } ? Spans : new[] { new ReadmeSpan(Text) };
 
     /// <summary>
     /// What a screen reader should say for this block.
@@ -35,21 +36,23 @@ public sealed record ReadmeBlock(
     /// coming, then the code itself as one string. Rendering each character
     /// as its own element would spell punctuation aloud one mark at a time.
     /// </summary>
-    public string AccessibleName
+    public string AccessibleName =>
+        Kind == ReadmeBlockKind.Code ? $"{CodeSummary}. {Text}" : Text;
+
+    /// <summary>
+    /// The line that introduces a code block in the document, without the
+    /// code itself. Kept separate so the document can put a break between
+    /// them rather than one long run-on.
+    /// </summary>
+    public string CodeSummary
     {
         get
         {
-            if (Kind != ReadmeBlockKind.Code)
-            {
-                return Text;
-            }
-
             var lines = CountLines(Text);
             var size = lines == 1 ? "1 line" : $"{lines} lines";
-
             return string.IsNullOrWhiteSpace(Language)
-                ? $"Code block, {size}. {Text}"
-                : $"Code block, {Language}, {size}. {Text}";
+                ? $"Code block, {size}"
+                : $"Code block, {Language}, {size}";
         }
     }
 
@@ -74,16 +77,17 @@ public sealed record ReadmeBlock(
 }
 
 /// <summary>
-/// A Markdown link lifted out of a block so it can be a real control.
+/// A run of a Markdown block: ordinary text, or a link still sitting in
+/// the sentence it belongs to.
 ///
-/// MAUI has no portable hyperlink, so the view renders these as buttons.
-/// NVDA's link list will not find them; the button list will. That is the
-/// closest portable answer, and it is still better than leaving the URL
-/// as characters inside a paragraph.
+/// Links used to be lifted out and rendered as buttons after the
+/// paragraph. That put them in the wrong role and the wrong place in
+/// reading order. They stay here so the document control can make them
+/// real hyperlinks. See docs/REPOSITORY-VIEW.md.
 /// </summary>
-public sealed record ReadmeLink(string Text, string Url)
+public sealed record ReadmeSpan(string Text, string? Url = null)
 {
-    public string AccessibleName => $"{Text}, link";
+    public bool IsLink => !string.IsNullOrEmpty(Url);
 }
 
 /// <summary>
@@ -125,12 +129,12 @@ public static partial class ReadmeDocument
 
             if (Heading().Match(line) is { Success: true } heading)
             {
-                var (text, links) = Inline(heading.Groups[2].Value);
+                var (text, spans) = Inline(heading.Groups[2].Value);
                 blocks.Add(new ReadmeBlock(
                     ReadmeBlockKind.Heading,
                     text,
                     heading.Groups[1].Value.Length,
-                    Links: links));
+                    Spans: spans));
                 i++;
                 continue;
             }
@@ -194,21 +198,26 @@ public static partial class ReadmeDocument
     private static int ReadList(string[] lines, int start, List<ReadmeBlock> blocks)
     {
         var items = new List<string>();
-        var links = new List<ReadmeLink>();
+        var spans = new List<ReadmeSpan>();
         var i = start;
 
         while (i < lines.Length && ListItem().Match(lines[i]) is { Success: true } match)
         {
-            var (text, itemLinks) = Inline(match.Groups[1].Value);
+            var (text, itemSpans) = Inline(match.Groups[1].Value);
+            if (spans.Count > 0)
+            {
+                spans.Add(new ReadmeSpan("\n"));
+            }
+
+            spans.AddRange(itemSpans);
             items.Add(text);
-            links.AddRange(itemLinks);
             i++;
         }
 
         blocks.Add(new ReadmeBlock(
             ReadmeBlockKind.List,
             string.Join("\n", items),
-            Links: links));
+            Spans: spans));
 
         return i;
     }
@@ -242,48 +251,76 @@ public static partial class ReadmeDocument
             i++;
         }
 
-        var (text, links) = Inline(body.ToString());
+        var (text, spans) = Inline(body.ToString());
         if (text.Length > 0)
         {
-            blocks.Add(new ReadmeBlock(ReadmeBlockKind.Paragraph, text, Links: links));
+            blocks.Add(new ReadmeBlock(ReadmeBlockKind.Paragraph, text, Spans: spans));
         }
 
         return i;
     }
 
     /// <summary>
-    /// Links become their visible text in the paragraph, and are also
-    /// returned separately so the view can make them activatable.
-    /// Images become their alt text. Emphasis markers are stripped so
-    /// they are not read as punctuation around every stressed word.
+    /// Links stay in the sentence as spans with a URL. Images become their
+    /// alt text. Emphasis markers are stripped so they are not read as
+    /// punctuation around every stressed word.
     /// </summary>
-    internal static (string Text, IReadOnlyList<ReadmeLink> Links) Inline(string raw)
+    internal static (string Text, IReadOnlyList<ReadmeSpan> Spans) Inline(string raw)
     {
-        var links = new List<ReadmeLink>();
-
         var withoutImages = Image().Replace(raw, m =>
             string.IsNullOrEmpty(m.Groups[1].Value) ? "image" : m.Groups[1].Value);
 
-        var withoutLinks = Link().Replace(withoutImages, m =>
+        var spans = new List<ReadmeSpan>();
+        var last = 0;
+
+        foreach (Match match in Link().Matches(withoutImages))
         {
-            var text = m.Groups[1].Value;
-            var url = m.Groups[2].Value;
-            if (!string.IsNullOrWhiteSpace(url))
+            if (match.Index > last)
             {
-                links.Add(new ReadmeLink(
-                    string.IsNullOrEmpty(text) ? url : text,
-                    url));
+                AddTextSpan(spans, withoutImages[last..match.Index]);
             }
 
-            return text;
-        });
+            var label = match.Groups[1].Value;
+            var url = match.Groups[2].Value.Trim();
+            var visible = CleanInline(string.IsNullOrEmpty(label) ? url : label);
+            if (visible.Length > 0)
+            {
+                spans.Add(string.IsNullOrEmpty(url)
+                    ? new ReadmeSpan(visible)
+                    : new ReadmeSpan(visible, url));
+            }
 
-        var cleaned = Emphasis().Replace(withoutLinks, m =>
+            last = match.Index + match.Length;
+        }
+
+        if (last < withoutImages.Length)
+        {
+            AddTextSpan(spans, withoutImages[last..]);
+        }
+
+        if (spans.Count == 0)
+        {
+            AddTextSpan(spans, withoutImages);
+        }
+
+        return (string.Concat(spans.Select(s => s.Text)), spans);
+    }
+
+    private static void AddTextSpan(List<ReadmeSpan> spans, string raw)
+    {
+        var cleaned = CleanInline(raw);
+        if (cleaned.Length > 0)
+        {
+            spans.Add(new ReadmeSpan(cleaned));
+        }
+    }
+
+    private static string CleanInline(string raw)
+    {
+        var cleaned = Emphasis().Replace(raw, m =>
             m.Groups[1].Success ? m.Groups[1].Value : m.Groups[2].Value);
         cleaned = InlineCode().Replace(cleaned, "$1");
-        cleaned = Whitespace().Replace(cleaned, " ").Trim();
-
-        return (cleaned, links);
+        return Whitespace().Replace(cleaned, " ");
     }
 
     [GeneratedRegex(@"^(#{1,6})\s+(.*)$")]

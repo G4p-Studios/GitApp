@@ -95,7 +95,7 @@ public partial class WorkDetailPage : ContentPage
         }
         else
         {
-            MarkdownRenderer.AddBlocks(BodyHost, _vm.BodyBlocks, OnLink, headingOffset: 1);
+            BodyHost.Children.Add(CreateDocument(_vm.BodyBlocks, headingOffset: 1));
         }
 
         if (_vm.Detail is { } detail)
@@ -120,7 +120,7 @@ public partial class WorkDetailPage : ContentPage
                 }
                 else
                 {
-                    MarkdownRenderer.AddBlocks(CommentsHost, blocks, OnLink, headingOffset: 2);
+                    CommentsHost.Children.Add(CreateDocument(blocks, headingOffset: 2));
                 }
             }
 
@@ -133,6 +133,19 @@ public partial class WorkDetailPage : ContentPage
         }
     }
 
-    private async void OnLink(object? sender, EventArgs e) =>
-        await MarkdownRenderer.OpenLinkAsync(sender);
+    private MarkdownDocumentView CreateDocument(IReadOnlyList<ReadmeBlock> blocks, int headingOffset)
+    {
+        var view = new MarkdownDocumentView
+        {
+            FillPane = false,
+            HeadingOffset = headingOffset,
+            BaseUri = _vm.DocumentBaseUri,
+            Blocks = blocks,
+        };
+        view.LinkActivated += OnLink;
+        return view;
+    }
+
+    private async void OnLink(object? sender, string url) =>
+        await MarkdownRenderer.OpenLinkAsync(url);
 }

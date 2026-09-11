@@ -4,6 +4,7 @@
              xmlns:a11y="clr-namespace:GitApp.Accessibility"
              xmlns:vm="clr-namespace:GitApp.ViewModels"
              xmlns:domain="clr-namespace:GitApp.Domain"
+             xmlns:local="clr-namespace:GitApp"
              x:Class="GitApp.RepositoryPage"
              x:DataType="vm:RepositoryViewModel"
              Title="Repository">
@@ -120,23 +121,24 @@
         <a11y:Pane x:Name="ReadmePane"
                    Grid.Row="1" Grid.Column="1"
                    PaneId="repo-readme" PaneName="Readme" PaneOrder="20">
-            <Grid RowDefinitions="Auto,*" Padding="12">
-                <Label Grid.Row="0"
-                       x:Name="ReadmeHeadingLabel"
-                       Text="{Binding ReadmeHeading}"
-                       FontSize="16"
-                       Margin="0,0,0,8"
-                       SemanticProperties.HeadingLevel="Level1" />
+            <Grid Padding="12">
+                <VerticalStackLayout x:Name="ReadmeEmptyHost"
+                                     Spacing="8"
+                                     IsVisible="{Binding NoReadme}">
+                    <Label x:Name="ReadmeHeadingLabel"
+                           Text="{Binding ReadmeHeading}"
+                           FontSize="16"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <Label x:Name="ReadmeEmptyLabel"
+                           Text="{Binding ReadmeEmpty}"
+                           FontSize="14"
+                           Opacity="0.7" />
+                </VerticalStackLayout>
 
-                <ScrollView Grid.Row="1" x:Name="ReadmeScroll">
-                    <VerticalStackLayout x:Name="ReadmeContent" Spacing="8">
-                        <Label x:Name="ReadmeEmptyLabel"
-                               Text="{Binding ReadmeEmpty}"
-                               FontSize="14"
-                               Opacity="0.7"
-                               IsVisible="{Binding NoReadme}" />
-                    </VerticalStackLayout>
-                </ScrollView>
+                <local:MarkdownDocumentView x:Name="ReadmeDocument"
+                                            FillPane="True"
+                                            ShowTitleInDocument="True"
+                                            IsVisible="{Binding HasReadme}" />
             </Grid>
         </a11y:Pane>
 

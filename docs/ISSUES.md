@@ -57,9 +57,9 @@ Two panes: Conversation and About.
 
 The conversation is a document, not a list. The title is heading 1, each
 comment is heading 3 under a heading 2 "Comments", and the bodies are the
-same Markdown rendering as the README (`docs/REPOSITORY-VIEW.md`): headings
-jumpable, links as buttons, a code block one label. Body headings are
-shifted down one level so they cannot outrank the title.
+same Markdown document as the README (`docs/REPOSITORY-VIEW.md`): arrow
+keys move a caret, links stay in the sentence as hyperlinks. Body headings
+are shifted down one level so they cannot outrank the title.
 
 About is the github.com sidebar, one fact per control: state, labels,
 assignees, milestone, and for a pull request the branches, commit count,

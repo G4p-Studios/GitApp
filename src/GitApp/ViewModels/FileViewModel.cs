@@ -98,6 +98,20 @@ public sealed class FileViewModel : ObservableObject
     public IReadOnlyList<string> AboutFacts =>
         _file?.AboutFacts ?? Array.Empty<string>();
 
+    public string DocumentBaseUri
+    {
+        get
+        {
+            var path = _entry.Path.Replace('\\', '/').Trim('/');
+            var slash = path.LastIndexOf('/');
+            var dir = slash < 0 ? string.Empty : path[..slash];
+            var root = _listed.HtmlUrl.TrimEnd('/');
+            return string.IsNullOrEmpty(dir)
+                ? $"{root}/blob/{_branch}/"
+                : $"{root}/blob/{_branch}/{dir}/";
+        }
+    }
+
     public FileLine? SelectedLine
     {
         get => _selectedLine;

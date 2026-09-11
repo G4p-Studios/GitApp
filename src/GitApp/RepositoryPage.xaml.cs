@@ -32,6 +32,8 @@ public partial class RepositoryPage : ContentPage
         PlatformFocus.TrackFocusWithin(BranchPicker, "repo-files");
         PlatformFocus.DescribeEmptyView(FileList, "This folder is empty");
 
+        ReadmeDocument.LinkActivated += OnReadmeLink;
+
         _vm.PickFolder = FolderPicker.PickAsync;
         _vm.ReadmeChanged += (_, _) => Dispatcher.Dispatch(() =>
         {
@@ -156,25 +158,23 @@ public partial class RepositoryPage : ContentPage
         && !PullsButton.IsFocused;
 
     /// <summary>
-    /// Native labels and buttons, not a web view and not a list. Headings
-    /// get a heading level so a screen reader can jump; links become
-    /// buttons because MAUI has no portable hyperlink; a code block is one
-    /// label so punctuation is not spelled one character at a time.
+    /// One native document, not a stack of labels and buttons. Arrow keys
+    /// move a caret; links stay in the sentence as hyperlinks. See
+    /// docs/REPOSITORY-VIEW.md.
     /// </summary>
     private void RenderReadme()
     {
-        var keepEmpty = ReadmeEmptyLabel;
-        ReadmeContent.Children.Clear();
-
         if (_vm.NoReadme)
         {
-            ReadmeContent.Children.Add(keepEmpty);
-            keepEmpty.IsVisible = true;
+            ReadmePane.EntryControl = ReadmeHeadingLabel;
             return;
         }
 
-        keepEmpty.IsVisible = false;
-        MarkdownRenderer.AddBlocks(ReadmeContent, _vm.ReadmeBlocks, OnReadmeLink);
+        ReadmeDocument.Title = _vm.ReadmeHeading;
+        ReadmeDocument.HeadingOffset = 0;
+        ReadmeDocument.BaseUri = $"{_listed.HtmlUrl.TrimEnd('/')}/blob/{_vm.CurrentBranch}/";
+        ReadmeDocument.Blocks = _vm.ReadmeBlocks;
+        ReadmePane.EntryControl = ReadmeDocument;
     }
 
     private void RenderAbout()
@@ -201,6 +201,6 @@ public partial class RepositoryPage : ContentPage
         AppNavigator.Show(page);
     }
 
-    private async void OnReadmeLink(object? sender, EventArgs e) =>
-        await MarkdownRenderer.OpenLinkAsync(sender);
+    private async void OnReadmeLink(object? sender, string url) =>
+        await MarkdownRenderer.OpenLinkAsync(url);
 }

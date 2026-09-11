@@ -4,6 +4,7 @@
              xmlns:a11y="clr-namespace:GitApp.Accessibility"
              xmlns:vm="clr-namespace:GitApp.ViewModels"
              xmlns:domain="clr-namespace:GitApp.Domain"
+             xmlns:local="clr-namespace:GitApp"
              x:Class="GitApp.FilePage"
              x:DataType="vm:FileViewModel"
              Title="File">
@@ -11,9 +12,9 @@
     <!--
       Two panes, cycled with F6: File and About.
 
-      Markdown is a document so headings are jumpable. Other text is a line
-      list you can arrow through. Binary and oversized files are a spoken
-      empty state, not a silent one. See docs/REPOSITORY-VIEW.md.
+      Markdown is a document you can arrow through. Other text is a line
+      list. Binary and oversized files are a spoken empty state, not a
+      silent one. See docs/REPOSITORY-VIEW.md.
     -->
 
     <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,280">
@@ -47,10 +48,10 @@
                        Margin="0,0,0,8"
                        SemanticProperties.Description="{Binding Summary}" />
 
-                <ScrollView Grid.Row="2"
-                            IsVisible="{Binding ShowDocument}">
-                    <VerticalStackLayout x:Name="DocumentHost" Spacing="8" />
-                </ScrollView>
+                <local:MarkdownDocumentView x:Name="FileDocument"
+                                            Grid.Row="2"
+                                            FillPane="True"
+                                            IsVisible="{Binding ShowDocument}" />
 
                 <CollectionView x:Name="LineList"
                                 Grid.Row="2"

@@ -75,6 +75,8 @@ public sealed class WorkDetailViewModel : ObservableObject
     public IReadOnlyList<string> AboutFacts =>
         _detail?.AboutFacts ?? Array.Empty<string>();
 
+    public string DocumentBaseUri => _listed.HtmlUrl.TrimEnd('/') + "/";
+
     public async Task InitialiseAsync()
     {
         if (_session.CreateClient() is not { } client)
