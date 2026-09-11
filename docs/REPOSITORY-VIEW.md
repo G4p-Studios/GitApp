@@ -25,10 +25,11 @@ Taken from the real page, top to bottom, then mapped onto panes.
    search, a different API, and a different screen.
 4. **Add file** and **Code** buttons. Add file is write (milestone 4).
    Clone is already on this screen and on the list.
-5. **The latest commit.** Branch HEAD, at the top of Files, not its own
-   pane. It is one fact. The file rows already carry last-touch, so the
-   banner does not change to "last commit in this folder" when you
-   descend: two different facts would then sound like the same one.
+5. **The latest commit.** Branch HEAD, at the foot of Files between the
+   table and the README, not its own pane. It is one fact. The file rows
+   already carry last-touch, so the banner does not change to "last
+   commit in this folder" when you descend: two different facts would
+   then sound like the same one.
 6. **The file table.** Directories first, then files, alphabetical inside
    each group, matching github.com. A parent-folder row appears once you
    are not at the root.
@@ -72,18 +73,23 @@ The two open questions on that table, and what we did:
 
 ## Structure
 
-Three panes, cycled with F6 (`ARCHITECTURE.md` 3.4):
+Three panes, cycled with F6 (`ARCHITECTURE.md` 3.4), placed where
+github.com places them: Files in the main column with the README beneath
+it, and About as the sidebar on the right. A sighted user and a screen
+reader user then describe the same screen to each other.
 
-- **Files** — branch picker, breadcrumb when inside a directory, latest
-  commit, file table. Enter or Space opens a folder or a file; Left goes
-  up one folder; Escape goes up, and at the root returns to the
+- **Files** — branch picker, breadcrumb when inside a directory, file
+  table, then the latest commit. Enter or Space opens a folder or a file;
+  Left goes up one folder; Escape goes up, and at the root returns to the
   repository list.
 - **Readme** — the README as one native document. Arrow keys move a
   caret line by line; links stay in the sentence they belong to.
 - **About** — one control per fact.
 
-The latest-commit line sits at the top of the Files pane rather than in its
-own pane.
+The latest-commit line is the last thing in the Files pane, between the
+table and the README: subject on one line, author, age and hash on the
+next, spoken as one name. It is text, not a control, because there is
+nowhere for it to go yet; a commit screen would make it a link.
 
 Enter or a click on a file opens it on its own screen. A submodule stays
 on the tree and says so: fetching a submodule as a blob would be the

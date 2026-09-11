@@ -22,6 +22,8 @@ public sealed class RepositoryViewModel : ObservableObject
     private string _pathDescription = string.Empty;
     private string _entrySummary = "Loading";
     private string _latestSummary = string.Empty;
+    private string _latestSubject = string.Empty;
+    private string _latestDetail = string.Empty;
     private string _readmeHeading = "Readme";
     private string _readmeEmpty = "This folder has no readme";
     private bool _hasPath;
@@ -109,6 +111,20 @@ public sealed class RepositoryViewModel : ObservableObject
     }
 
     public bool HasLatest => !string.IsNullOrEmpty(_latestSummary);
+
+    /// <summary>The commit subject, shown on its own line as github.com does.</summary>
+    public string LatestSubject
+    {
+        get => _latestSubject;
+        private set => Set(ref _latestSubject, value);
+    }
+
+    /// <summary>Author, age and hash, the second line under the subject.</summary>
+    public string LatestDetail
+    {
+        get => _latestDetail;
+        private set => Set(ref _latestDetail, value);
+    }
 
     public bool HasPath
     {
@@ -288,6 +304,8 @@ public sealed class RepositoryViewModel : ObservableObject
         EntrySummary = view.EntrySummary;
         HasPath = !string.IsNullOrEmpty(view.Path);
         LatestSummary = view.Latest?.AccessibleName ?? string.Empty;
+        LatestSubject = view.Latest?.Subject ?? string.Empty;
+        LatestDetail = view.Latest?.Detail ?? string.Empty;
         _htmlUrl = string.IsNullOrEmpty(view.HtmlUrl) ? _listed.HtmlUrl : view.HtmlUrl;
 
         _ignoreBranch = true;
