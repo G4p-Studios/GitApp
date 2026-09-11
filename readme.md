@@ -15,5 +15,12 @@ it counts as done. See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) for the
 contract and [docs/SPIKE-MAUI.md](docs/SPIKE-MAUI.md) for the measurements
 behind the framework choice.
 
+## Contributing
+
+Read [AGENTS.md](AGENTS.md) first. It is the working guide for this
+repository: conventions, how to build, and how accessibility is verified
+here. `CLAUDE.md` points at the same file so every agent and every person
+works from one set of rules.
+
 ## Why the name GitApp?
 Simple, because you can do anything you would usually do on github.com, GitHub Desktop, and eventually even use other Git hosts like GitLab and Codeberg.
