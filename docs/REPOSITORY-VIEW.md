@@ -34,7 +34,12 @@ Taken from the real page, top to bottom, then mapped onto panes.
    are not at the root.
 7. **The README**, rendered, in its own pane.
 8. **About**: description, topics, language, stars, watchers, forks,
-   releases, branch and tag counts.
+   releases, open issues and pull requests, branch and tag counts.
+
+Issues and pull requests are not panes on this screen. They are their own
+lists, reached from the toolbar, documented in `docs/ISSUES.md`. A pane
+you F6 through to reach the README is friction, and a list of issues is
+not a fact about the files you are looking at.
 
 ## What it has to become in speech
 
@@ -70,8 +75,9 @@ The two open questions on that table, and what we did:
 Three panes, cycled with F6 (`ARCHITECTURE.md` 3.4):
 
 - **Files** — branch picker, breadcrumb when inside a directory, latest
-  commit, file table. Enter or Space opens a folder; Left goes up one
-  folder; Escape goes up, and at the root returns to the repository list.
+  commit, file table. Enter or Space opens a folder or a file; Left goes
+  up one folder; Escape goes up, and at the root returns to the
+  repository list.
 - **Readme** — the rendered README as a document, not a list. Headings
   expose `HeadingLevel` so a screen reader can jump by heading.
 - **About** — one control per fact.
@@ -79,9 +85,43 @@ Three panes, cycled with F6 (`ARCHITECTURE.md` 3.4):
 The latest-commit line sits at the top of the Files pane rather than in its
 own pane.
 
-Opening an individual file is not built. Enter on a file says so, rather
-than doing nothing, because silence after a keypress reads as the key
-having failed.
+Enter or a click on a file opens it on its own screen. A submodule stays
+on the tree and says so: fetching a submodule as a blob would be the
+wrong object.
+
+## Opening a file
+
+A new screen, not a fourth pane on the tree. The file table is a place
+you pick from; the contents are a place you read. Mixing them would mean
+F6-ing past hundreds of source lines to reach the README of the folder
+you were in.
+
+Two panes: **File** then **About**. Escape returns to the file table.
+
+- **Markdown** (`.md`, `.markdown`, `.mdown`, `.mdwn`) is the same native
+  document as the README: headings jumpable, links as buttons, a code
+  block one label. File headings are shifted down one level so they
+  cannot outrank the filename. Showing source instead would give up
+  heading jump, which is the reason Markdown is rendered at all. The
+  source remains on github.com, via the toolbar button.
+- **Other text** is a line list, Consolas, with the line number in a
+  gutter the way the diff viewer is. Each row announces content first,
+  line number last: `return false;, line 15`. Leading with the number
+  would open every row with "line". An empty line says `blank, line 7`;
+  silence is indistinguishable from a failed read.
+- **Binary** says "This file is not text." **Larger than GitHub will
+  return as text** (about a megabyte) says "This file is too large to
+  show here." Both offer github.com on the toolbar. An empty file says
+  it is empty.
+- **About** is path, branch, size, line count or why it cannot be shown,
+  and the last-touch commit if the tree had it. Size is words, never
+  "KB": a screen reader reads "KB" as letters.
+
+The load is one GraphQL blob (`object(expression: "{branch}:{path}")`)
+and the line list is not filled until it has returned, so the list does
+not rebuild under the cursor. Completion is the filename, then what
+arrived: `Program.cs, 412 lines, 18 kilobytes`. Intra-line highlighting
+is not here; it is unsolved in the diff viewer too.
 
 ## Markdown, and why it is not a web view
 
@@ -121,7 +161,7 @@ arrived, for the same reason: a half-annotated list is still a list.
 
 ## What is not verified
 
-The signed-in path. Parsing, last-touch merging, README rendering and the
-row wording are covered by unit tests against recorded GraphQL, but this
-screen has not been opened against a live token. Same gap as the
-repository list (`docs/GITHUB.md`).
+The repository screen itself has been opened against a real account. The
+file view's parsing, line wording, size wording, and the binary / too-
+large / missing-blob cases are covered by unit tests against recorded
+GraphQL. It has not yet been listened through on a live token.

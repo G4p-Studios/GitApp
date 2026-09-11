@@ -35,6 +35,16 @@
                     Command="{Binding OpenOnGitHubCommand}"
                     MinimumHeightRequest="32"
                     SemanticProperties.Hint="Opens this repository in your browser" />
+            <Button Text="Issues"
+                    x:Name="IssuesButton"
+                    Clicked="OnOpenIssues"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Lists issues in this repository" />
+            <Button Text="Pull requests"
+                    x:Name="PullsButton"
+                    Clicked="OnOpenPulls"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Lists pull requests in this repository" />
         </HorizontalStackLayout>
 
         <!-- Files -->
@@ -83,7 +93,7 @@
                                 ItemsSource="{Binding Entries}"
                                 SelectedItem="{Binding SelectedEntry, Mode=TwoWay}"
                                 SelectionMode="Single"
-                                SemanticProperties.Description="Files. Enter opens a folder, Left goes up one folder.">
+                                SemanticProperties.Description="Files. Enter opens a folder or a file, Left goes up one folder.">
                     <CollectionView.EmptyView>
                         <Label Text="This folder is empty"
                                Padding="8" FontSize="13" Opacity="0.7" />

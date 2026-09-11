@@ -8,13 +8,19 @@ namespace GitApp;
 
 public partial class RepositoryPage : ContentPage
 {
+    private readonly GitHubSession _session;
+    private readonly GitHubRepository _listed;
     private readonly RepositoryViewModel _vm;
+    private WorkListPage? _issuesPage;
+    private WorkListPage? _pullsPage;
     private bool _initialised;
 
     public RepositoryPage(GitHubSession session, GitHubRepository listed)
     {
         InitializeComponent();
 
+        _session = session;
+        _listed = listed;
         _vm = new RepositoryViewModel(session, listed);
         BindingContext = _vm;
 
@@ -41,6 +47,8 @@ public partial class RepositoryPage : ContentPage
             }
         });
         _vm.Cloned += (_, path) => Cloned?.Invoke(this, path);
+        _vm.OpenFileRequested += (_, entry) =>
+            AppNavigator.Show(new FilePage(_session, _listed, entry, _vm.CurrentBranch));
     }
 
     /// <summary>Raised so a clone started here lands on the local list.</summary>
@@ -106,9 +114,10 @@ public partial class RepositoryPage : ContentPage
     }
 
     /// <summary>
-    /// Enter or Space opens the selected file-table row, but only when the
-    /// file list itself has focus. The branch picker and the other panes
-    /// keep the key.
+    /// Enter or Space opens the selected file-table row — a folder, a
+    /// file, or a spoken note for a submodule — but only when the file
+    /// list itself has focus. The branch picker and the other panes keep
+    /// the key.
     /// </summary>
     private bool TryActivate() =>
         KeysAreForFileList() && _vm.TryOpenSelected();
@@ -142,7 +151,9 @@ public partial class RepositoryPage : ContentPage
         && !BranchPicker.IsFocused
         && !BackButton.IsFocused
         && !CloneButton.IsFocused
-        && !OpenGitHubButton.IsFocused;
+        && !OpenGitHubButton.IsFocused
+        && !IssuesButton.IsFocused
+        && !PullsButton.IsFocused;
 
     /// <summary>
     /// Native labels and buttons, not a web view and not a list. Headings
@@ -163,28 +174,7 @@ public partial class RepositoryPage : ContentPage
         }
 
         keepEmpty.IsVisible = false;
-
-        foreach (var block in _vm.ReadmeBlocks)
-        {
-            ReadmeContent.Children.Add(CreateBlock(block));
-
-            foreach (var link in block.Links)
-            {
-                var button = new Button
-                {
-                    Text = link.Text,
-                    FontSize = 13,
-                    Padding = new Thickness(0),
-                    MinimumHeightRequest = 28,
-                    HorizontalOptions = LayoutOptions.Start,
-                    CommandParameter = link.Url,
-                };
-                SemanticProperties.SetDescription(button, link.AccessibleName);
-                SemanticProperties.SetHint(button, $"Opens {link.Url}");
-                button.Clicked += OnReadmeLink;
-                ReadmeContent.Children.Add(button);
-            }
-        }
+        MarkdownRenderer.AddBlocks(ReadmeContent, _vm.ReadmeBlocks, OnReadmeLink);
     }
 
     private void RenderAbout()
@@ -199,63 +189,18 @@ public partial class RepositoryPage : ContentPage
         }
     }
 
-    private static View CreateBlock(ReadmeBlock block)
+    private void OnOpenIssues(object? sender, EventArgs e) =>
+        ShowWork(GitHubWorkKind.Issue, ref _issuesPage);
+
+    private void OnOpenPulls(object? sender, EventArgs e) =>
+        ShowWork(GitHubWorkKind.PullRequest, ref _pullsPage);
+
+    private void ShowWork(GitHubWorkKind kind, ref WorkListPage? page)
     {
-        var label = new Label
-        {
-            Text = block.Text,
-            FontSize = block.Kind == ReadmeBlockKind.Heading ? HeadingSize(block.Level) : 14,
-        };
-
-        SemanticProperties.SetDescription(label, block.AccessibleName);
-
-        if (block.Kind == ReadmeBlockKind.Heading)
-        {
-            SemanticProperties.SetHeadingLevel(label, HeadingLevel(block.Level));
-        }
-
-        if (block.Kind == ReadmeBlockKind.Code)
-        {
-            label.FontFamily = "Consolas";
-            label.FontSize = 13;
-        }
-
-        return label;
+        page ??= new WorkListPage(_session, _listed, kind);
+        AppNavigator.Show(page);
     }
 
-    private static double HeadingSize(int level) => level switch
-    {
-        1 => 22,
-        2 => 18,
-        3 => 16,
-        _ => 14,
-    };
-
-    private static SemanticHeadingLevel HeadingLevel(int level) => level switch
-    {
-        1 => SemanticHeadingLevel.Level1,
-        2 => SemanticHeadingLevel.Level2,
-        3 => SemanticHeadingLevel.Level3,
-        4 => SemanticHeadingLevel.Level4,
-        5 => SemanticHeadingLevel.Level5,
-        _ => SemanticHeadingLevel.Level6,
-    };
-
-    private async void OnReadmeLink(object? sender, EventArgs e)
-    {
-        if (sender is not Button { CommandParameter: string url } || string.IsNullOrEmpty(url))
-        {
-            return;
-        }
-
-        try
-        {
-            await Launcher.Default.OpenAsync(url);
-            Announcer.Current.Announce($"Opened {url} in your browser");
-        }
-        catch (Exception)
-        {
-            Announcer.Current.Announce("Could not open your browser.");
-        }
-    }
+    private async void OnReadmeLink(object? sender, EventArgs e) =>
+        await MarkdownRenderer.OpenLinkAsync(sender);
 }

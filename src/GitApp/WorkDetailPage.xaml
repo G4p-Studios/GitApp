@@ -1,0 +1,76 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             x:Class="GitApp.WorkDetailPage"
+             x:DataType="vm:WorkDetailViewModel"
+             Title="Conversation">
+
+    <!--
+      Two panes, cycled with F6: Conversation and About.
+
+      The conversation is a document, not a list: the title is a heading,
+      each comment is a heading, and the bodies are rendered Markdown so
+      a screen reader can jump by heading. See docs/ISSUES.md.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,280">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
+                               Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back to list"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to the list. Escape does the same." />
+            <Button Text="View on github.com"
+                    Command="{Binding OpenOnGitHubCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens this conversation in your browser" />
+        </HorizontalStackLayout>
+
+        <a11y:Pane x:Name="ConversationPane"
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="work-conversation" PaneName="Conversation" PaneOrder="10">
+            <ScrollView Padding="12">
+                <VerticalStackLayout x:Name="ConversationContent" Spacing="10">
+                    <Label x:Name="TitleLabel"
+                           Text="{Binding Title}"
+                           FontSize="22"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <Label Text="{Binding Metadata}"
+                           FontSize="14"
+                           Opacity="0.8"
+                           SemanticProperties.Description="{Binding Metadata}" />
+                    <VerticalStackLayout x:Name="BodyHost" Spacing="8" />
+                    <Label x:Name="CommentsHeadingLabel"
+                           Text="{Binding CommentsHeading}"
+                           FontSize="16"
+                           Margin="0,12,0,0"
+                           SemanticProperties.HeadingLevel="Level2" />
+                    <VerticalStackLayout x:Name="CommentsHost" Spacing="12" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </a11y:Pane>
+
+        <a11y:Pane x:Name="AboutPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="work-about" PaneName="About" PaneOrder="20">
+            <ScrollView Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="AboutHeading"
+                           Text="About"
+                           FontSize="16"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <VerticalStackLayout x:Name="AboutFactsHost" Spacing="8" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

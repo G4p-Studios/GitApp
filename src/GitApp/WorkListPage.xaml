@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             x:Class="GitApp.WorkListPage"
+             x:DataType="vm:WorkListViewModel"
+             Title="Issues">
+
+    <!--
+      Two panes, cycled with F6: Filter and the list.
+
+      Filter is first because Open against Closed changes what every row
+      means, and because with a few hundred issues arrowing is not a way
+      to find one. See docs/ISSUES.md.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="280,*">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
+                               Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back to repository"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to the repository. Escape does the same." />
+            <Button x:Name="RefreshButton"
+                    Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Fetches the list from GitHub again" />
+        </HorizontalStackLayout>
+
+        <a11y:Pane x:Name="FilterPane"
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="work-filter" PaneName="Filter" PaneOrder="10">
+            <VerticalStackLayout Padding="12" Spacing="8">
+                <Label Text="{Binding Heading}" FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Text="{Binding RepositoryName}" FontSize="14" Opacity="0.8" />
+
+                <Picker x:Name="StatePicker"
+                        ItemsSource="{Binding StateOptions}"
+                        SelectedItem="{Binding SelectedState, Mode=TwoWay}"
+                        ItemDisplayBinding="{Binding AccessibleName}"
+                        Title="State"
+                        SemanticProperties.Description="State"
+                        SemanticProperties.Hint="Open, closed, or all" />
+
+                <Entry x:Name="FilterEntry"
+                       Text="{Binding Filter, Mode=TwoWay}"
+                       Placeholder="Filter by title, number, author or label"
+                       SemanticProperties.Description="Filter"
+                       SemanticProperties.Hint="Narrows the list by title, number, author or label" />
+            </VerticalStackLayout>
+        </a11y:Pane>
+
+        <a11y:Pane x:Name="ListPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="work-list" PaneName="List" PaneOrder="20">
+            <Grid RowDefinitions="Auto,*" Padding="12">
+                <Label Grid.Row="0"
+                       Text="{Binding ListSummary}"
+                       FontSize="14"
+                       Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="1"
+                                x:Name="WorkList"
+                                ItemsSource="{Binding Items}"
+                                SelectedItem="{Binding SelectedItem, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="{Binding Heading}">
+                    <CollectionView.EmptyView>
+                        <Label Text="Nothing to show"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:GitHubWorkItem">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <VerticalStackLayout.GestureRecognizers>
+                                    <TapGestureRecognizer
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenCommand}"
+                                        CommandParameter="{Binding .}" />
+                                </VerticalStackLayout.GestureRecognizers>
+                                <Label Text="{Binding Title}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

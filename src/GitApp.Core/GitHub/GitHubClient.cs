@@ -15,7 +15,7 @@ namespace GitApp.GitHub;
 /// single REST call to /user/repos returns every field that screen shows in
 /// one response, so that reason is already satisfied. The repository view
 /// is GraphQL, because last-touch per file cannot be had from REST in one
-/// request at all (docs/REPOSITORY-VIEW.md).
+/// request at all; file blobs use the same client (docs/REPOSITORY-VIEW.md).
 ///
 /// Everything normalizes into <c>GitApp.Domain</c> records at this boundary.
 /// No screen ever sees a GitHub-shaped object.

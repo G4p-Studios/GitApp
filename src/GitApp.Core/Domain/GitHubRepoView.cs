@@ -182,6 +182,8 @@ public sealed record GitHubRepoView(
     int ReleaseCount,
     int BranchCount,
     int TagCount,
+    int OpenIssueCount,
+    int OpenPullRequestCount,
     string? HomepageUrl,
     string HtmlUrl,
     string CurrentBranch,
@@ -249,6 +251,11 @@ public sealed record GitHubRepoView(
             facts.Add(ReleaseCount == 0
                 ? "No releases"
                 : ReleaseCount == 1 ? "1 release" : $"{ReleaseCount} releases");
+
+            facts.Add(OpenIssueCount == 1 ? "1 open issue" : $"{OpenIssueCount} open issues");
+            facts.Add(OpenPullRequestCount == 1
+                ? "1 open pull request"
+                : $"{OpenPullRequestCount} open pull requests");
 
             var branches = BranchCount == 1 ? "1 branch" : $"{BranchCount} branches";
             var tags = TagCount == 1 ? "1 tag" : $"{TagCount} tags";

@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             x:Class="GitApp.FilePage"
+             x:DataType="vm:FileViewModel"
+             Title="File">
+
+    <!--
+      Two panes, cycled with F6: File and About.
+
+      Markdown is a document so headings are jumpable. Other text is a line
+      list you can arrow through. Binary and oversized files are a spoken
+      empty state, not a silent one. See docs/REPOSITORY-VIEW.md.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,280">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
+                               Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back to files"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to the file table. Escape does the same." />
+            <Button Text="View on github.com"
+                    Command="{Binding OpenOnGitHubCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens this file in your browser" />
+        </HorizontalStackLayout>
+
+        <a11y:Pane x:Name="FilePane"
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="file-contents" PaneName="File" PaneOrder="10">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+                <Label x:Name="TitleLabel"
+                       Grid.Row="0"
+                       Text="{Binding Title}"
+                       FontSize="22"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Grid.Row="1"
+                       Text="{Binding Summary}"
+                       FontSize="14"
+                       Opacity="0.8"
+                       Margin="0,0,0,8"
+                       SemanticProperties.Description="{Binding Summary}" />
+
+                <ScrollView Grid.Row="2"
+                            IsVisible="{Binding ShowDocument}">
+                    <VerticalStackLayout x:Name="DocumentHost" Spacing="8" />
+                </ScrollView>
+
+                <CollectionView x:Name="LineList"
+                                Grid.Row="2"
+                                ItemsSource="{Binding Lines}"
+                                SelectedItem="{Binding SelectedLine, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                IsVisible="{Binding ShowLines}"
+                                SemanticProperties.Description="File contents">
+                    <CollectionView.EmptyView>
+                        <Label Text="This file is empty"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:FileLine">
+                            <Grid ColumnDefinitions="56,*" Padding="4,1"
+                                  SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Grid.Column="0"
+                                       Text="{Binding NumberDisplay}"
+                                       FontSize="12"
+                                       Opacity="0.6"
+                                       HorizontalTextAlignment="End"
+                                       FontFamily="Consolas" />
+                                <Label Grid.Column="1"
+                                       Text="{Binding Content}"
+                                       FontSize="13"
+                                       FontFamily="Consolas"
+                                       LineBreakMode="TailTruncation" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+
+                <Label x:Name="UnavailableLabel"
+                       Grid.Row="2"
+                       Text="{Binding UnavailableMessage}"
+                       FontSize="16"
+                       IsVisible="{Binding ShowUnavailable}"
+                       SemanticProperties.Description="{Binding UnavailableMessage}" />
+            </Grid>
+        </a11y:Pane>
+
+        <a11y:Pane x:Name="AboutPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="file-about" PaneName="About" PaneOrder="20">
+            <ScrollView Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="AboutHeading"
+                           Text="About"
+                           FontSize="16"
+                           SemanticProperties.HeadingLevel="Level1" />
+                    <VerticalStackLayout x:Name="AboutFactsHost" Spacing="8" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

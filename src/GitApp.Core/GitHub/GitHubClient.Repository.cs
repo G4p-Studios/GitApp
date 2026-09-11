@@ -48,6 +48,8 @@ public sealed partial class GitHubClient
               totalCount
             }
             releases { totalCount }
+            openIssues: issues(states: OPEN) { totalCount }
+            openPullRequests: pullRequests(states: OPEN) { totalCount }
             object(expression: $qualifiedRef) {
               ... on Commit {
                 oid
@@ -261,6 +263,18 @@ public sealed partial class GitHubClient
             releaseCount = Int(releases, "totalCount");
         }
 
+        var openIssues = 0;
+        if (repo.TryGetProperty("openIssues", out var openIssuesEl))
+        {
+            openIssues = Int(openIssuesEl, "totalCount");
+        }
+
+        var openPulls = 0;
+        if (repo.TryGetProperty("openPullRequests", out var openPullsEl))
+        {
+            openPulls = Int(openPullsEl, "totalCount");
+        }
+
         var watchers = 0;
         if (repo.TryGetProperty("watchers", out var watchersEl))
         {
@@ -284,6 +298,8 @@ public sealed partial class GitHubClient
             ReleaseCount: releaseCount,
             BranchCount: branchCount == 0 ? branches.Count : branchCount,
             TagCount: tagCount,
+            OpenIssueCount: openIssues,
+            OpenPullRequestCount: openPulls,
             HomepageUrl: String(repo, "homepageUrl"),
             HtmlUrl: String(repo, "url") ?? string.Empty,
             CurrentBranch: currentBranch,

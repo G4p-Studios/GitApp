@@ -76,6 +76,8 @@ public sealed class RepositoryViewModel : ObservableObject
 
     public event EventHandler? ReadmeChanged;
 
+    public event EventHandler<GitHubTreeEntry>? OpenFileRequested;
+
     public string Title
     {
         get => _title;
@@ -154,6 +156,9 @@ public sealed class RepositoryViewModel : ObservableObject
         }
     }
 
+    public string CurrentBranch =>
+        _selectedBranch?.Name ?? _loadedBranch ?? "HEAD";
+
     public GitHubTreeEntry? SelectedEntry
     {
         get => _selectedEntry;
@@ -227,7 +232,13 @@ public sealed class RepositoryViewModel : ObservableObject
             return true;
         }
 
-        _announcer.Announce("Opening individual files is not built yet.");
+        if (entry.Kind == GitHubEntryKind.Submodule)
+        {
+            _announcer.Announce($"{entry.Name} is a submodule, not a file.");
+            return true;
+        }
+
+        OpenFileRequested?.Invoke(this, entry);
         return true;
     }
 

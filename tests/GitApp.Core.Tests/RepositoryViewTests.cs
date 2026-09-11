@@ -35,6 +35,8 @@ public class RepositoryViewTests
               },
               "tags": { "totalCount": 0 },
               "releases": { "totalCount": 0 },
+              "openIssues": { "totalCount": 4 },
+              "openPullRequests": { "totalCount": 1 },
               "object": {
                 "oid": "1aabfb0abcde",
                 "abbreviatedOid": "1aabfb0",
@@ -79,6 +81,8 @@ public class RepositoryViewTests
         Assert.Contains("G4p-Studios/GitApp, public", view.AboutFacts);
         Assert.Contains("Topics, accessibility, git", view.AboutFacts);
         Assert.Contains("No releases", view.AboutFacts);
+        Assert.Contains("4 open issues", view.AboutFacts);
+        Assert.Contains("1 open pull request", view.AboutFacts);
     }
 
     [Fact]
