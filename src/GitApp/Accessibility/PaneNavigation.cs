@@ -13,13 +13,40 @@ public static partial class PaneNavigation
     private static bool _announcerHooked;
 
     /// <summary>
-    /// Call once from the page that owns the panes, after its content is set.
+    /// Hand the whole pane model over to one screen.
+    ///
+    /// Called every time a page appears, not once at construction. With
+    /// more than one screen the registry has to be emptied and refilled,
+    /// or F6 cycles to regions belonging to a page that is no longer
+    /// visible: focus goes nowhere and nothing is announced. The keys go
+    /// the same way, so a handler belonging to another screen cannot
+    /// swallow a keystroke meant for this one.
     /// </summary>
     public static void Attach(Page page)
     {
         HookAnnouncer();
+
+        HunkNavigator = null;
+        RowExpander = null;
+        BackHandler = null;
+
+        FocusManager.Current.ResetPanes();
+
+        foreach (var pane in Pane.Within(page))
+        {
+            pane.Register();
+        }
+
         AttachPlatform(page);
     }
+
+    /// <summary>
+    /// What Escape does on this screen. Null where Escape means nothing,
+    /// so the key falls through rather than appearing to be swallowed.
+    /// </summary>
+    public static Func<bool>? BackHandler { get; set; }
+
+    internal static bool Back() => BackHandler?.Invoke() ?? false;
 
     /// <summary>
     /// Moves to the next or previous difference in the diff viewer. Set by
@@ -58,12 +85,48 @@ public static partial class PaneNavigation
     /// announces the window and the newly focused control on activation, and
     /// our own "X pane" on top of that is duplicate speech.
     /// </summary>
-    public static void FocusFirstPane()
+    /// <summary>
+    /// <paramref name="announce"/> is false at startup, where the screen
+    /// reader already announces the window and the focused control, and
+    /// true when arriving on a screen mid-session, where nothing else says
+    /// the screen changed.
+    /// </summary>
+    public static bool FocusFirstPane(bool announce = false)
     {
         var first = FocusManager.Current.FirstPane;
-        if (first is not null)
+
+        return first is not null && FocusManager.Current.TryFocusPane(first.Id, announce);
+    }
+
+    /// <summary>
+    /// Put focus on the first pane, now or as soon as the screen can take
+    /// it.
+    ///
+    /// A page that has just been swapped in has no loaded controls yet, so
+    /// the first attempt fails silently and focus stays on whatever the
+    /// previous screen had. That is the state where a screen reader user
+    /// has nothing read, nothing highlighted, and no way to tell the screen
+    /// changed at all. So it is attempted again on load, and once more on a
+    /// short delay for the case where the page was already loaded from a
+    /// previous visit and Loaded never fires again.
+    /// </summary>
+    public static void FocusFirstPaneWhenReady(Page page, bool announce = false)
+    {
+        if (FocusFirstPane(announce))
         {
-            FocusManager.Current.FocusPane(first.Id, announce: false);
+            return;
+        }
+
+        page.Loaded -= OnLoaded;
+        page.Loaded += OnLoaded;
+
+        page.Dispatcher.DispatchDelayed(
+            TimeSpan.FromMilliseconds(200), () => FocusFirstPane(announce));
+
+        void OnLoaded(object? sender, EventArgs e)
+        {
+            page.Loaded -= OnLoaded;
+            FocusFirstPane(announce);
         }
     }
 

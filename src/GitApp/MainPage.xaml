@@ -49,6 +49,12 @@
             <Button Text="Push"
                     Command="{Binding PushCommand}"
                     MinimumHeightRequest="32" />
+            <BoxView WidthRequest="1" Margin="4,0" />
+            <Button x:Name="GitHubButton"
+                    Text="GitHub"
+                    Clicked="OnOpenGitHub"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Sign in and browse the repositories on your GitHub account" />
         </HorizontalStackLayout>
 
         <!-- Repositories -->

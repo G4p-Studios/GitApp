@@ -78,3 +78,39 @@ public class SettingsTests
         }
     }
 }
+
+public class RedactionTests
+{
+    [Theory]
+    [InlineData("ghp_0123456789abcdefghijABCDEFGHIJ0123")]
+    [InlineData("gho_0123456789abcdefghijABCDEFGHIJ0123")]
+    [InlineData("github_pat_11ABCDEFG0aBcDeFgHiJkLmNoPqRsTuV")]
+    public void TokensNeverReachTheUser(string token)
+    {
+        var message = $"Bad credentials for {token} at api.github.com";
+
+        var safe = GitApp.Services.Redaction.Apply(message);
+
+        Assert.DoesNotContain(token, safe);
+        Assert.Contains("[redacted]", safe);
+        Assert.Contains("api.github.com", safe);
+    }
+
+    [Fact]
+    public void CredentialsInARemoteUrlAreStripped()
+    {
+        var safe = GitApp.Services.Redaction.Apply(
+            "fatal: could not read https://alex:ghp_secretsecretsecret@github.com/a/b.git");
+
+        Assert.DoesNotContain("ghp_secretsecretsecret", safe);
+        Assert.Contains("github.com/a/b.git", safe);
+    }
+
+    [Fact]
+    public void OrdinaryTextIsLeftAlone()
+    {
+        const string message = "Could not reach GitHub. Check your internet connection.";
+
+        Assert.Equal(message, GitApp.Services.Redaction.Apply(message));
+    }
+}

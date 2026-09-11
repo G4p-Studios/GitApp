@@ -1,0 +1,163 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             x:Class="GitApp.GitHubPage"
+             x:DataType="vm:GitHubViewModel"
+             Title="GitHub">
+
+    <!--
+      Two panes, cycled with F6: Account and Repositories.
+
+      The account pane is first because signing in is the precondition for
+      everything else on this screen, and because when something is missing
+      that should be there, the first thing to check is which account you
+      are signed in as.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="340,*">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
+                               Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back to repositories"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to your local repositories. Escape does the same." />
+            <Button Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Fetches your repository list from GitHub again" />
+        </HorizontalStackLayout>
+
+        <!-- Account -->
+        <a11y:Pane x:Name="AccountPane"
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="github-account" PaneName="Account" PaneOrder="10">
+            <VerticalStackLayout Padding="12" Spacing="8">
+
+                <Label Text="GitHub" FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+
+                <Label Text="{Binding Status}" FontSize="14"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <!-- Signed out: token entry -->
+                <VerticalStackLayout IsVisible="{Binding IsSignedOut}" Spacing="8">
+
+                    <Label FontSize="13" Opacity="0.8"
+                           Text="Sign in with a personal access token. On github.com go to Settings, Developer settings, Personal access tokens, and create one with the repo scope." />
+
+                    <Entry x:Name="TokenEntry"
+                           Text="{Binding Token, Mode=TwoWay}"
+                           IsPassword="True"
+                           Placeholder="Personal access token"
+                           SemanticProperties.Description="Personal access token"
+                           SemanticProperties.Hint="Paste a token beginning with ghp underscore" />
+
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="Sign in"
+                                Command="{Binding SignInCommand}"
+                                MinimumHeightRequest="32" />
+                        <Button Text="Create a token on github.com"
+                                Clicked="OnCreateToken"
+                                MinimumHeightRequest="32"
+                                SemanticProperties.Hint="Opens your browser at the token settings page" />
+                    </HorizontalStackLayout>
+
+                    <!--
+                      Shown only when a client ID is configured. A button
+                      that can never work is a puzzle for someone who cannot
+                      see that it is greyed out.
+                    -->
+                    <Button Text="Sign in with your browser"
+                            IsVisible="{Binding CanUseBrowserSignIn}"
+                            Clicked="OnBrowserSignIn"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Shows a code to enter on github.com" />
+
+                    <Label IsVisible="{Binding HasDeviceCode}"
+                           Text="{Binding DeviceCodeMessage}"
+                           FontSize="14"
+                           SemanticProperties.HeadingLevel="Level2" />
+                </VerticalStackLayout>
+
+                <!-- Signed in -->
+                <VerticalStackLayout IsVisible="{Binding IsSignedIn}" Spacing="8">
+                    <Button Text="Sign out"
+                            Command="{Binding SignOutCommand}"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Forgets the token stored on this computer" />
+                </VerticalStackLayout>
+            </VerticalStackLayout>
+        </a11y:Pane>
+
+        <!-- Repositories -->
+        <a11y:Pane x:Name="RemoteReposPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="github-repos" PaneName="Repositories" PaneOrder="20">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+
+                <Label Grid.Row="0"
+                       Text="{Binding ListSummary}"
+                       FontSize="14"
+                       Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <Entry Grid.Row="1"
+                       x:Name="FilterEntry"
+                       Text="{Binding Filter, Mode=TwoWay}"
+                       Placeholder="Filter repositories"
+                       Margin="0,0,0,8"
+                       SemanticProperties.Description="Filter repositories"
+                       SemanticProperties.Hint="Narrows the list by name, owner or description" />
+
+                <CollectionView Grid.Row="2"
+                                x:Name="RemoteRepoList"
+                                ItemsSource="{Binding Repositories}"
+                                SelectedItem="{Binding SelectedRepository, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Your GitHub repositories">
+                    <CollectionView.EmptyView>
+                        <Label Text="No repositories to show"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:GitHubRepository">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Padding="8,6"
+                                  ColumnSpacing="6"
+                                  SemanticProperties.Description="{Binding AccessibleName}">
+                                <VerticalStackLayout Grid.Column="0">
+                                    <Label Text="{Binding FullName}" FontSize="14" />
+                                    <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                                </VerticalStackLayout>
+
+                                <Button Grid.Column="1"
+                                        Text="Clone"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.CloneCommand}"
+                                        CommandParameter="{Binding .}"
+                                        FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                        SemanticProperties.Description="{Binding Name, StringFormat='Clone {0}'}" />
+
+                                <Button Grid.Column="2"
+                                        Text="Open"
+                                        Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenInBrowserCommand}"
+                                        CommandParameter="{Binding .}"
+                                        FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                        SemanticProperties.Description="{Binding Name, StringFormat='Open {0} on github.com'}" />
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <!-- Status line -->
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

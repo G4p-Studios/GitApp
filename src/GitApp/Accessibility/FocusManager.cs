@@ -111,6 +111,22 @@ public sealed class FocusManager
         }
     }
 
+    /// <summary>
+    /// Forget every pane, because a different screen is taking over.
+    ///
+    /// Registration used to rely on Pane.Loaded and Pane.Unloaded, which is
+    /// fine while there is one screen and wrong the moment there are two:
+    /// swapping the window's page does not reliably unload the old one, so
+    /// its panes stayed in the registry and F6 cycled to regions that were
+    /// no longer on screen. Focus went nowhere and nothing was announced.
+    /// The screen being attached now says what its panes are.
+    /// </summary>
+    public void ResetPanes()
+    {
+        _panes.Clear();
+        _activePaneId = null;
+    }
+
     public PaneRegistration? FirstPane => _panes.FirstOrDefault();
 
     public PaneRegistration? ActivePane => _activePaneId is null ? null : Find(_activePaneId);
@@ -155,6 +171,19 @@ public sealed class FocusManager
 
         Enter(pane, announce);
         return pane;
+    }
+
+    /// <summary>
+    /// Focus a pane and say whether focus actually landed there.
+    ///
+    /// The distinction matters on a screen that has only just appeared:
+    /// its controls are not loaded yet, focus quietly fails, and announcing
+    /// the pane anyway tells the user they are somewhere they are not.
+    /// </summary>
+    public bool TryFocusPane(string id, bool announce)
+    {
+        var pane = Find(id);
+        return pane is not null && Enter(pane, announce);
     }
 
     // -----------------------------------------------------------------
@@ -240,21 +269,31 @@ public sealed class FocusManager
         }
     }
 
-    private void Enter(PaneRegistration pane, bool announce)
+    private bool Enter(PaneRegistration pane, bool announce)
     {
-        _activePaneId = pane.Id;
-
         // Where the user last was, then the content's entry point, then the
         // container as a last resort.
-        if (!TryRestore(pane) && !TryFocus(pane.LastFocused) && !TryFocus(pane.Entry))
+        var focused = TryRestore(pane)
+            || TryFocus(pane.LastFocused)
+            || TryFocus(pane.Entry)
+            || TryFocus(pane.Container);
+
+        if (!focused)
         {
-            TryFocus(pane.Container);
+            // Saying nothing is right here. The alternative is announcing a
+            // pane the user has not been moved into, which is worse than
+            // silence because it cannot be corrected by listening.
+            return false;
         }
+
+        _activePaneId = pane.Id;
 
         if (announce)
         {
             PaneEntered?.Invoke(this, pane);
         }
+
+        return true;
     }
 
     private static bool TryFocus(VisualElement? element)

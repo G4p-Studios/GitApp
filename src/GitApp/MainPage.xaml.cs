@@ -1,5 +1,6 @@
 using GitApp.Accessibility;
 using GitApp.Domain;
+using GitApp.Services;
 using GitApp.ViewModels;
 
 namespace GitApp;
@@ -7,6 +8,9 @@ namespace GitApp;
 public partial class MainPage : ContentPage
 {
     private readonly MainViewModel _vm = new();
+
+    private GitHubPage? _gitHubPage;
+    private bool _initialised;
 
     public MainPage()
     {
@@ -52,6 +56,17 @@ public partial class MainPage : ContentPage
         Announcer.Current.StatusChanged += (_, text) =>
             Dispatcher.Dispatch(() => StatusLabel.Text = text);
 
+        PaneNavigation.Attach(this);
+    }
+
+    /// <summary>
+    /// The keys this screen owns.
+    ///
+    /// Set on every appearance, because Attach clears the handlers so that
+    /// one screen's keys cannot swallow another's.
+    /// </summary>
+    private void WireKeys()
+    {
         // F7 moves between differences. Running out of them is the one case
         // that has to be announced, because nothing moves and silence after
         // a keypress reads as the key having done nothing.
@@ -115,8 +130,6 @@ public partial class MainPage : ContentPage
 
             return MoveToDiffRow(index, announcement);
         };
-
-        PaneNavigation.Attach(this);
     }
 
     /// <summary>
@@ -154,15 +167,48 @@ public partial class MainPage : ContentPage
         return true;
     }
 
+    /// <summary>
+    /// Opening the GitHub screen.
+    ///
+    /// The page is kept rather than rebuilt, so going back and forth does
+    /// not re-sign-in, refetch the repository list, or lose a filter the
+    /// user typed.
+    /// </summary>
+    private void OnOpenGitHub(object? sender, EventArgs e)
+    {
+        if (_gitHubPage is null)
+        {
+            _gitHubPage = new GitHubPage(_vm.GitHub);
+            _gitHubPage.Cloned += async (_, path) => await _vm.AdoptClonedRepositoryAsync(path);
+        }
+
+        AppNavigator.Show(_gitHubPage);
+    }
+
     protected override async void OnAppearing()
     {
         base.OnAppearing();
+
+        // This screen owns the panes and the keys again.
+        PaneNavigation.Attach(this);
+        WireKeys();
+
+        if (_initialised)
+        {
+            // Coming back from the GitHub screen. Focus has to be placed
+            // again: a page swap leaves it on an element that is no longer
+            // shown, which reads as the app having gone silent.
+            PaneNavigation.FocusFirstPaneWhenReady(this, announce: true);
+            return;
+        }
+
+        _initialised = true;
 
         await _vm.InitialiseAsync();
 
         // Focus after the data is in place, so focus lands on a real row
         // rather than on an empty list. Deferred a frame because panes
         // register as their children load.
-        Dispatcher.Dispatch(PaneNavigation.FocusFirstPane);
+        PaneNavigation.FocusFirstPaneWhenReady(this);
     }
 }

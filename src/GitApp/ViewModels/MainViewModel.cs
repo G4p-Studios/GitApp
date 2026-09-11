@@ -2,6 +2,7 @@ using System.Collections.ObjectModel;
 using System.Windows.Input;
 using GitApp.Accessibility;
 using GitApp.Domain;
+using GitApp.GitHub;
 using GitApp.Services;
 
 namespace GitApp.ViewModels;
@@ -21,6 +22,7 @@ public sealed class MainViewModel : ObservableObject
     private readonly HashSet<int> _expandedHunks = new();
 
     private FileDiff _diff = FileDiff.Empty;
+    private GitHubSession? _github;
 
     private RepositoryItem? _selectedRepository;
     private string _commitMessage = string.Empty;
@@ -289,6 +291,37 @@ public sealed class MainViewModel : ObservableObject
     public Func<Task<string?>>? PickFolder { get; set; }
 
     // -----------------------------------------------------------------
+
+    /// <summary>
+    /// The GitHub session, shared by every screen that talks to GitHub.
+    ///
+    /// Created on first use rather than in the constructor, because the
+    /// client ID for browser sign-in comes out of settings and those are
+    /// loaded asynchronously.
+    /// </summary>
+    public GitHubSession GitHub => _github ??= new GitHubSession(
+        TokenStoreFactory.Create(),
+        deviceFlowClientId: _settings.Settings.GitHubClientId);
+
+    /// <summary>
+    /// Add a repository cloned from somewhere else in the app, and select
+    /// it. Cloning something and then having to go and find it by hand is
+    /// the sort of gap that only shows up in real use.
+    /// </summary>
+    public async Task AdoptClonedRepositoryAsync(string path)
+    {
+        if (Repositories.Any(r => string.Equals(r.Path, path, StringComparison.OrdinalIgnoreCase)))
+        {
+            return;
+        }
+
+        await _store.AddAsync(path);
+
+        var item = new RepositoryItem(path);
+        Repositories.Add(item);
+        item.Status = await _git.GetStatusAsync(path);
+        SelectedRepository = item;
+    }
 
     public async Task InitialiseAsync()
     {

@@ -47,8 +47,22 @@ public static partial class PaneNavigation
     private static void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
         if (e.Key is not (VirtualKey.F6 or VirtualKey.F7 or VirtualKey.Enter
-            or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left))
+            or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left
+            or VirtualKey.Escape))
         {
+            return;
+        }
+
+        // Escape backs out one level (ARCHITECTURE 3.4). Only where the
+        // screen says it means something: swallowing it everywhere would
+        // break the escape that closes a picker or cancels an edit.
+        if (e.Key == VirtualKey.Escape)
+        {
+            if (Back())
+            {
+                e.Handled = true;
+            }
+
             return;
         }
 

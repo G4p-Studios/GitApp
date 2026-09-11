@@ -72,8 +72,16 @@ Warnings are errors in practice: the tree is at zero and should stay there.
   who cannot glance at the window. `RepositoryStore.LoadError` is the
   pattern.
 - **F6 cycles panes**; F7 moves between differences; Enter, Space, Left and
-  Right fold. Pane order leaves gaps (10, 20, 25, 30) so panes can be
-  inserted.
+  Right fold; Escape backs out. Pane order leaves gaps (10, 20, 25, 30) so
+  panes can be inserted.
+- **A screen owns its panes and its keys.** `PaneNavigation.Attach(page)`
+  runs on every appearance, clears the pane registry and the key handlers,
+  and refills them from that page. Registering panes on a load event is not
+  enough once there is more than one screen: a page swap does not reliably
+  unload the old page, and its panes linger.
+- **Focus must land on every screen change**, and the first attempt fails
+  because nothing is loaded yet. Use
+  `PaneNavigation.FocusFirstPaneWhenReady(page)`, which retries.
 
 ## How to verify accessibility here
 
@@ -98,6 +106,7 @@ that is not in the foreground: `docs/DEVELOPING.md`.
 - `docs/ARCHITECTURE.md` — the governing spec. Accessibility contract,
   system architecture, milestones. Start here.
 - `docs/DIFF-VIEWER.md` — the diff viewer, and why it deviates from VS Code.
+- `docs/GITHUB.md` — sign-in, token storage, and the remote repository list.
 - `docs/REPOSITORY-VIEW.md` — the github.com-style repository screen.
   Designed, not built.
 - `docs/DEVELOPING.md` — prerequisites, build, verification method, traps.
@@ -114,8 +123,11 @@ real repositories — add, remove, clone, status, stage, commit, fetch, pull,
 push, history, branch switching and creation, conflict resolution, and the
 diff viewer with folding.
 
-Milestone 3 is next: GitHub read. Auth by OAuth device flow, repository
-browse, issues, pull requests, code view. Nothing of it exists yet.
+Milestone 3 is in progress: GitHub read. Sign-in by personal access token
+and the remote repository list are built and work (`docs/GITHUB.md`);
+browser sign-in is written but needs a registered OAuth client ID; the
+repository screen is designed only (`docs/REPOSITORY-VIEW.md`); issues and
+pull requests are not started.
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

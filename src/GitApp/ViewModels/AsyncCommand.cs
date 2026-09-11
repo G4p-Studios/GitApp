@@ -1,4 +1,6 @@
 using System.Windows.Input;
+using GitApp.Accessibility;
+using GitApp.Services;
 
 namespace GitApp.ViewModels;
 
@@ -39,6 +41,10 @@ public sealed class AsyncCommand : ICommand
         {
             await _execute();
         }
+        catch (Exception ex)
+        {
+            CommandFailure.Report(ex);
+        }
         finally
         {
             _running = false;
@@ -48,6 +54,40 @@ public sealed class AsyncCommand : ICommand
 
     public void RaiseCanExecuteChanged() =>
         CanExecuteChanged?.Invoke(this, EventArgs.Empty);
+}
+
+/// <summary>
+/// What to do when a command throws.
+///
+/// Before this existed, an unexpected exception left the app completely
+/// silent: the start of the operation had been announced, nothing followed,
+/// and there was no way to tell a failure from a slow network or a hang.
+/// Silence is the one outcome a screen reader user cannot interpret, so
+/// every command now ends in something spoken, even the paths nobody
+/// anticipated.
+/// </summary>
+public static class CommandFailure
+{
+    /// <summary>Test seam.</summary>
+    public static Action<Exception>? Handler { get; set; }
+
+    public static void Report(Exception ex)
+    {
+        if (Handler is not null)
+        {
+            Handler(ex);
+            return;
+        }
+
+        // Redacted, because this is the generic path: whatever the
+        // exception is carrying ends up spoken aloud, and a credential
+        // could be in it.
+        Announcer.Current.Announce(
+            $"Something went wrong: {Redaction.Apply(ex.Message)}", Urgency.Assertive);
+
+        Announcer.Current.SetStatus(
+            $"{ex.GetType().Name}: {Redaction.Apply(ex.Message)}");
+    }
 }
 
 /// <summary>Typed variant, for per-row commands.</summary>
@@ -81,6 +121,10 @@ public sealed class AsyncCommand<T> : ICommand
         try
         {
             await _execute(Cast(parameter));
+        }
+        catch (Exception ex)
+        {
+            CommandFailure.Report(ex);
         }
         finally
         {

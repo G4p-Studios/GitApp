@@ -183,6 +183,34 @@ public sealed class Announcer
     {
         _lastMessage = text;
         _sinceLastSpoken.Restart();
-        Speak(text);
+
+        // Always on the UI thread.
+        //
+        // The throttle flushes from a timer continuation, which runs on the
+        // thread pool, and the platform announcement needs the UI thread.
+        // Off it, the call fails inside the continuation where nothing can
+        // observe it, so the message is simply lost.
+        //
+        // That is the worst possible failure here and it hid for a while,
+        // because it only bites when a result arrives within the throttle
+        // window of its own start message. Every long Git operation was
+        // slow enough to speak directly; a GitHub sign-in that fails in
+        // 200 ms announced "Signing in to GitHub" and then nothing at all.
+        try
+        {
+            if (MainThread.IsMainThread)
+            {
+                Speak(text);
+                return;
+            }
+
+            MainThread.BeginInvokeOnMainThread(() => Speak(text));
+        }
+        catch (Exception)
+        {
+            // No MainThread outside a running app, which is the case in
+            // tests. Speaking directly is right there.
+            Speak(text);
+        }
     }
 }

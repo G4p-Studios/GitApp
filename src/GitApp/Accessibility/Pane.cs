@@ -73,7 +73,13 @@ public class Pane : ContentView
 
     private VisualElement? _entry;
 
-    private void OnLoaded(object? sender, EventArgs e)
+    /// <summary>
+    /// Join the registry. Called by the page as it appears, and again on
+    /// load, because the two orderings differ between a first show and a
+    /// return to a screen that is already built. Registering twice is safe:
+    /// the registry keys on the pane id.
+    /// </summary>
+    internal void Register()
     {
         if (string.IsNullOrEmpty(PaneId))
         {
@@ -91,9 +97,46 @@ public class Pane : ContentView
         }
     }
 
+    private void OnLoaded(object? sender, EventArgs e) => Register();
+
     private void OnUnloaded(object? sender, EventArgs e)
     {
         _registration?.Dispose();
         _registration = null;
     }
+
+    /// <summary>
+    /// Every pane inside a page.
+    ///
+    /// Walked over the declared tree rather than the visual one, because
+    /// this runs as a screen appears and the visual tree is not
+    /// necessarily built yet. The declared tree exists the moment
+    /// InitializeComponent returns, which is what makes registration
+    /// deterministic instead of dependent on load ordering.
+    /// </summary>
+    internal static IEnumerable<Pane> Within(Element root)
+    {
+        foreach (var child in ChildrenOf(root))
+        {
+            if (child is Pane pane)
+            {
+                yield return pane;
+            }
+
+            foreach (var nested in Within(child))
+            {
+                yield return nested;
+            }
+        }
+    }
+
+    private static IEnumerable<Element> ChildrenOf(Element element) => element switch
+    {
+        ContentPage { Content: { } content } => new Element[] { content },
+        Layout layout => layout.Children.OfType<Element>(),
+        ContentView { Content: { } content } => new Element[] { content },
+        ScrollView { Content: { } content } => new Element[] { content },
+        Border { Content: { } content } => new Element[] { content },
+        _ => Enumerable.Empty<Element>(),
+    };
 }

@@ -439,9 +439,15 @@ ships with a sparse package, a decision that also constrains installer design.
   device flow also avoids shipping a client secret.
 - **Personal access token entry** is the fallback, and the initial mechanism for
   other Git hosts.
-- Tokens are stored through `CredentialModule` using the Win32 Credential Manager
-  API, which works without package identity. Tokens never touch `AsyncStorage`,
-  never appear in logs, and are redacted from error reports.
+- Tokens are stored in the Win32 Credential Manager, which works without
+  package identity. MAUI's `SecureStorage` is not used on Windows because it
+  needs identity and GitApp is unpackaged; other platforms keep it.
+  See `Platforms/Windows/CredentialStore.Windows.cs`.
+- Tokens never land in a file this app writes, never appear in a log line,
+  and never reach an error message. The last one is not left to inspection:
+  `Services/Redaction.cs` filters text on its way to the user, because the
+  risky paths are the generic ones where some unanticipated exception is
+  formatted and announced.
 
 ### 4.6 State management
 
@@ -483,7 +489,9 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    creation, conflict resolution, and the diff viewer with folding and a
    context setting, all against real repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code
-   view. The repository screen is designed in `docs/REPOSITORY-VIEW.md`.
+   view. Sign-in and the remote repository list are built
+   (`docs/GITHUB.md`); the repository screen is designed but not built
+   (`docs/REPOSITORY-VIEW.md`); issues and pull requests are not started.
 4. **GitHub write.** Comment, review, merge, release management.
 5. **Notifications.** Polling, toasts, inbox.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.

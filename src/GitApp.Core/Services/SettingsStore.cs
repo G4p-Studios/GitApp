@@ -24,6 +24,19 @@ public sealed class AppSettings
     public int LargeHunkLines { get; set; } = DiffRow.DefaultLargeHunkLines;
 
     /// <summary>
+    /// The OAuth client ID for browser sign-in.
+    ///
+    /// Empty by default, because GitApp has no registered GitHub OAuth
+    /// application yet and borrowing another product's client ID would mean
+    /// users granting access to something that is not this app. Until one
+    /// is registered, sign-in is by personal access token and the app says
+    /// so rather than offering a button that cannot work. Anyone can put
+    /// their own here: register an OAuth app on GitHub with device flow
+    /// enabled and paste its client ID.
+    /// </summary>
+    public string? GitHubClientId { get; set; }
+
+    /// <summary>
     /// Keep values in a range the UI can actually present. A context of a
     /// thousand is not a preference, it is a corrupt file.
     /// </summary>
@@ -31,6 +44,7 @@ public sealed class AppSettings
     {
         DiffContextLines = Math.Clamp(DiffContextLines, 0, 50),
         LargeHunkLines = Math.Clamp(LargeHunkLines, 5, 1000),
+        GitHubClientId = string.IsNullOrWhiteSpace(GitHubClientId) ? null : GitHubClientId.Trim(),
     };
 }
 
