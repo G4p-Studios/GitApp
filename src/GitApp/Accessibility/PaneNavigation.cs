@@ -31,6 +31,18 @@ public static partial class PaneNavigation
 
     internal static bool MoveToHunk(int direction) => HunkNavigator?.Invoke(direction) ?? false;
 
+    /// <summary>
+    /// Folds or unfolds the difference under the cursor in the diff viewer.
+    /// Null toggles; true and false are the arrow keys, which say which
+    /// direction they mean rather than flipping whatever is there.
+    ///
+    /// Returns false when the key does not apply here, so Enter and Space
+    /// keep working everywhere else in the window.
+    /// </summary>
+    public static Func<bool?, bool>? RowExpander { get; set; }
+
+    internal static bool Expand(bool? open) => RowExpander?.Invoke(open) ?? false;
+
     /// <summary>Next pane. Bound to F6.</summary>
     public static void Next() => FocusManager.Current.CyclePane(1);
 

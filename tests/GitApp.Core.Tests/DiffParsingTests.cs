@@ -206,8 +206,25 @@ public class DiffParsingTests
         var spoken = one.AccessibleName(1, 1);
 
         Assert.Contains("1 line changed", spoken);
-        Assert.Contains("no lines changed", spoken);
         Assert.DoesNotContain("1 lines changed", spoken);
+    }
+
+    [Fact]
+    public void AnEmptySideIsNamedRatherThanCountedAtZero()
+    {
+        // A new file. "original line 0, no lines changed" is both untrue and
+        // confusing, and an absence is the one thing speech cannot convey.
+        var added = new DiffHunk(0, 0, 1, 105, Array.Empty<DiffLine>());
+
+        Assert.Equal(
+            "Difference 1 of 1, nothing in the original, modified line 1, 105 lines changed",
+            added.AccessibleName(1, 1));
+
+        var deleted = new DiffHunk(1, 105, 0, 0, Array.Empty<DiffLine>());
+
+        Assert.Equal(
+            "Difference 1 of 1, original line 1, 105 lines changed, nothing in the modified file",
+            deleted.AccessibleName(1, 1));
     }
 
     [Fact]

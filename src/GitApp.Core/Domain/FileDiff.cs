@@ -91,11 +91,28 @@ public sealed record DiffHunk(
     /// The header announcement, following VS Code's wording because it is
     /// well judged: position in the whole first, since that is what the
     /// scrollbar was telling a sighted reader.
+    ///
+    /// <paramref name="state"/> is "collapsed" or "expanded" for a hunk big
+    /// enough to be foldable, and null for one that is always shown. It sits
+    /// straight after the position because it is the actionable fact, and
+    /// because that is where a tree view reports the same thing.
     /// </summary>
-    public string AccessibleName(int index, int total) =>
+    public string AccessibleName(int index, int total, string? state = null) =>
         $"Difference {index} of {total}, " +
-        $"original line {OriginalStart}, {Pluralise(OriginalCount)}, " +
-        $"modified line {ModifiedStart}, {Pluralise(ModifiedCount)}";
+        (state is null ? string.Empty : $"{state}, ") +
+        $"{Side(OriginalStart, OriginalCount, "original", "nothing in the original")}, " +
+        $"{Side(ModifiedStart, ModifiedCount, "modified", "nothing in the modified file")}";
+
+    /// <summary>
+    /// One half of the header.
+    ///
+    /// A side with no lines is a new or deleted file, and "original line 0,
+    /// no lines changed" is both untrue and confusing. Saying what it is
+    /// beats leaving the listener to infer it from an absence, which is the
+    /// one thing speech cannot convey.
+    /// </summary>
+    private static string Side(int start, int count, string which, string empty) =>
+        count == 0 ? empty : $"{which} line {start}, {Pluralise(count)}";
 
     public string Display => $"@@ -{OriginalStart},{OriginalCount} +{ModifiedStart},{ModifiedCount} @@";
 

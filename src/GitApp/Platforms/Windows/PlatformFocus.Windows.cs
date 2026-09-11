@@ -97,6 +97,10 @@ public static partial class PlatformFocus
 
         void OnGotFocus(object sender, RoutedEventArgs e)
         {
+            // Focus arrived here by some route other than F6, so tell the
+            // manager where it is.
+            FocusManager.Current.NoteActivePane(paneId);
+
             // Remember the container, not the data item: re-focusing the
             // container is what actually restores the caret position and the
             // screen reader's sense of place.

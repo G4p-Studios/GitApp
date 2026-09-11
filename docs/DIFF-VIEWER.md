@@ -1,6 +1,6 @@
 # The diff viewer
 
-Status: implemented, 2026-09-11
+Status: implemented, 2026-09-11. Folding and the context setting added the same day.
 
 Diff presentation is the hardest accessibility problem in a Git client, and
 the one every existing client handles badly. This document is the design, and
@@ -84,6 +84,8 @@ is the same rule the rest of the app follows for list rows
 | Row | Announcement |
 | --- | --- |
 | Hunk header | `Difference 2 of 5, original line 154, 12 lines changed, modified line 159, 39 lines changed` |
+| Folded hunk header | `Difference 7 of 7, collapsed, original line 527, 18 lines changed, modified line 588, 89 lines changed` |
+| New file | `Difference 1 of 1, nothing in the original, modified line 1, 105 lines changed` |
 | Unchanged, same number | `{content}, unchanged line 12` |
 | Unchanged, renumbered | `{content}, original line 12, modified line 15` |
 | Added | `{content}, added, modified line 15` |
@@ -92,6 +94,62 @@ is the same rule the rest of the app follows for list rows
 | Binary file | `{name}, binary file, no text diff available` |
 
 Pluralisation is real: "1 line changed", not "1 lines changed".
+
+A side with no lines at all is named rather than counted at zero. A new
+file's header used to open "original line 0, no lines changed", which is
+both untrue and confusing, and leaving the listener to infer the absence
+from a missing clause is the one thing speech cannot do.
+
+## Large differences fold
+
+A four-hundred line hunk is technically navigable and practically not: it is
+four hundred keypresses to find out whether the next difference was worth
+reading. So a hunk longer than **40 lines** starts folded, and its header
+says so.
+
+Folding is modelled on a tree, not on a separate summary view, because the
+tree is the interaction Windows users already have — it is what the Settings
+app's expanders do, and what a screen reader already knows how to report.
+The folded hunk stays in the same flat list, in the same place, contributing
+its header. Reading the shape of a whole file is then a few Down presses
+over the headers, and drilling in is one more key.
+
+| Key | Effect |
+| --- | --- |
+| Enter, Space | Fold or unfold the difference under the cursor |
+| Right | Unfold |
+| Left | From inside a difference, go out to its header. From the header, fold it |
+
+Left taking two steps matters more than it looks. Without the first step,
+getting out of a four-hundred line block means arrowing back up through all
+of it — the exact problem folding exists to solve.
+
+Three consequences of doing it in the flat list:
+
+- **The difference numbers do not renumber.** "Difference 7 of 7" is the
+  seventh difference in the file whether or not the six before it are
+  folded. Only the set positions move, and those describe the rows actually
+  present, which is what they should describe.
+- **F7 still lands on every difference**, folded or not, so the jump keys
+  and the fold state are independent.
+- **The opening summary counts what is hidden**: `MainViewModel.cs, 7
+  differences, 137 lines added, 5 lines removed, unstaged, 1 large
+  difference collapsed`. Learning there is hidden content at the start beats
+  discovering it by arriving at a header the list stops after.
+
+Folding is a reading position, not a property of the file, so it resets when
+a different file is shown.
+
+## How much context
+
+Three lines, git's own default, adjustable in the diff pane from 0, 3, 6, 12
+or 25. Discrete choices rather than a free number, so the control is one
+arrow press per step and reads as a short list rather than a text field.
+
+This is an accessibility setting, not a cosmetic one. Context is what it
+costs to listen to a diff, and the right answer is genuinely different for
+someone reading at 200 words a minute and someone reading at 700. It
+persists in `settings.json` beside the repository list.
 
 ## Navigation
 
@@ -106,16 +164,33 @@ knows how far through they are, not just within the current hunk.
 
 ## Open questions
 
-- **How much context.** Currently three lines, git's default. More context
-  helps orientation and costs listening time. This should probably become a
-  setting, but a default has to be chosen and three is defensible.
 - **Intra-line differences.** When one word changes on a long line, the
   viewer says the whole line twice, once as removed and once as added, and
   the listener has to spot the difference themselves. VS Code has the same
   problem. Announcing character-level changes is possible and might be worse:
   "line 12, changed, word 4 from foo to bar" is precise and hard to follow.
   Unresolved.
-- **Very large hunks.** A 400-line hunk is technically navigable and
-  practically not. Some form of summarise-then-drill-in is probably needed.
 - **Word wrap and long lines.** A 300-character line read in one breath is
   its own problem, separate from diffing.
+- **Expand all.** With several folded differences, opening each one is a
+  keypress apiece. Tree views use `*` on the numeric keypad for this, which
+  is discoverable to almost nobody. No key chosen yet.
+- **Is 40 lines the right threshold?** It is a judgement, not a measurement:
+  below it, deciding to unfold costs more than arrowing through. It is
+  stored as a setting but has no control yet, because a number nobody can
+  reach is not yet a preference.
+
+## Not yet verified
+
+The folding has been checked against the live UI Automation tree, which is
+where every accessibility bug in this project has been found so far. It has
+**not** been listened to through NVDA end to end. The one thing the tree
+cannot confirm is whether the state change is spoken at a useful moment
+rather than clipped by the next announcement.
+
+There is no ExpandCollapse pattern on the header rows. MAUI's CollectionView
+gives no way to supply one without replacing the item container, so the
+state is carried as the words "collapsed" and "expanded" in the name, which
+is what a screen reader would say from the pattern anyway, and the change is
+announced explicitly. If this proves not to be enough in practice, the fix
+is a custom automation peer on the Windows item container.

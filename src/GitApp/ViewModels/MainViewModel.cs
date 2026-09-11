@@ -10,7 +10,17 @@ public sealed class MainViewModel : ObservableObject
 {
     private readonly GitService _git;
     private readonly RepositoryStore _store;
+    private readonly SettingsStore _settings;
     private readonly Announcer _announcer;
+
+    /// <summary>
+    /// Which large hunks the user has opened, by index within the current
+    /// file's diff. Cleared whenever a different file is shown: folding is a
+    /// reading position, not a property of the file.
+    /// </summary>
+    private readonly HashSet<int> _expandedHunks = new();
+
+    private FileDiff _diff = FileDiff.Empty;
 
     private RepositoryItem? _selectedRepository;
     private string _commitMessage = string.Empty;
@@ -23,10 +33,15 @@ public sealed class MainViewModel : ObservableObject
     private bool _selectedChangeIsStaged;
     private string _diffSummary = "No file selected";
 
-    public MainViewModel(GitService? git = null, RepositoryStore? store = null, Announcer? announcer = null)
+    public MainViewModel(
+        GitService? git = null,
+        RepositoryStore? store = null,
+        Announcer? announcer = null,
+        SettingsStore? settings = null)
     {
         _git = git ?? new GitService();
         _store = store ?? new RepositoryStore();
+        _settings = settings ?? new SettingsStore();
         _announcer = announcer ?? Announcer.Current;
 
         AddRepositoryCommand = new AsyncCommand(AddRepositoryAsync);
@@ -71,6 +86,40 @@ public sealed class MainViewModel : ObservableObject
     {
         get => _diffSummary;
         private set => Set(ref _diffSummary, value);
+    }
+
+    /// <summary>
+    /// The context sizes offered in the diff pane. Discrete choices rather
+    /// than a free number, so the control is one arrow press per step and
+    /// reads as a short list.
+    /// </summary>
+    public IReadOnlyList<int> ContextLineOptions { get; } = new[] { 0, 3, 6, 12, 25 };
+
+    /// <summary>
+    /// Unchanged lines shown around each change. Changing it reloads the
+    /// current diff, because the answer comes from git, not from us.
+    /// </summary>
+    public int ContextLines
+    {
+        get => _settings.Settings.DiffContextLines;
+        set
+        {
+            if (_settings.Settings.DiffContextLines == value)
+            {
+                return;
+            }
+
+            _settings.Settings.DiffContextLines = value;
+            Raise(nameof(ContextLines));
+
+            _ = SaveAndReloadDiffAsync();
+        }
+    }
+
+    private async Task SaveAndReloadDiffAsync()
+    {
+        await _settings.SaveAsync();
+        await LoadDiffAsync();
     }
 
     /// <summary>
@@ -243,6 +292,14 @@ public sealed class MainViewModel : ObservableObject
 
     public async Task InitialiseAsync()
     {
+        await _settings.LoadAsync();
+        Raise(nameof(ContextLines));
+
+        if (_settings.LoadError is { } settingsProblem)
+        {
+            _announcer.SetStatus(settingsProblem);
+        }
+
         await _store.LoadAsync();
 
         if (_store.LoadError is { } problem)
@@ -328,6 +385,8 @@ public sealed class MainViewModel : ObservableObject
             Unstaged.Clear();
             Conflicts.Clear();
             Commits.Clear();
+            _diff = FileDiff.Empty;
+            _expandedHunks.Clear();
             DiffRows.Clear();
             DiffSummary = "No file selected";
             return;
@@ -520,6 +579,8 @@ public sealed class MainViewModel : ObservableObject
     {
         if (SelectedRepository is not { } repo || _selectedChange is null)
         {
+            _diff = FileDiff.Empty;
+            _expandedHunks.Clear();
             DiffRows.Clear();
             DiffSummary = "No file selected";
             return;
@@ -527,16 +588,87 @@ public sealed class MainViewModel : ObservableObject
 
         var change = _selectedChange;
 
-        var diff = await _git.GetDiffAsync(repo.Path, change.Path, _selectedChangeIsStaged);
+        _diff = await _git.GetDiffAsync(
+            repo.Path, change.Path, _selectedChangeIsStaged, _settings.Settings.DiffContextLines);
 
-        Replace(DiffRows, DiffRow.From(diff));
+        // A fold is a reading position within one file, so it does not
+        // survive moving to another.
+        _expandedHunks.Clear();
+        RebuildDiffRows();
 
         var side = _selectedChangeIsStaged ? "staged" : "unstaged";
-        DiffSummary = diff.HasChanges
-            ? $"{diff.Summary}, {side}"
+        DiffSummary = _diff.HasChanges
+            ? $"{_diff.Summary}, {side}{FoldedSuffix()}"
             : $"{change.FileName}, no {side} changes to show";
 
         _announcer.Announce(DiffSummary);
+    }
+
+    /// <summary>
+    /// Said as part of the opening summary, so a listener learns there is
+    /// hidden content before they start reading rather than by arriving at a
+    /// header that stops.
+    /// </summary>
+    private string FoldedSuffix()
+    {
+        var folded = DiffRow.CountFolded(_diff, _expandedHunks, _settings.Settings.LargeHunkLines);
+
+        return folded switch
+        {
+            0 => string.Empty,
+            1 => ", 1 large difference collapsed",
+            _ => $", {folded} large differences collapsed",
+        };
+    }
+
+    private void RebuildDiffRows() =>
+        Replace(DiffRows, DiffRow.Build(_diff, _expandedHunks, _settings.Settings.LargeHunkLines));
+
+    /// <summary>
+    /// Fold or unfold the hunk whose header is at <paramref name="rowIndex"/>,
+    /// and return what to say about it.
+    ///
+    /// The header keeps its index either way, because lines are inserted
+    /// after it, so the caller can put focus back on the same row without
+    /// searching for it.
+    /// </summary>
+    public string? ToggleHunk(int rowIndex, bool? expand = null)
+    {
+        if (rowIndex < 0 || rowIndex >= DiffRows.Count)
+        {
+            return null;
+        }
+
+        var row = DiffRows[rowIndex];
+        if (!row.IsHeader || !row.IsExpandable)
+        {
+            return null;
+        }
+
+        var open = expand ?? !row.IsExpanded;
+        if (open == row.IsExpanded)
+        {
+            return null;
+        }
+
+        if (open)
+        {
+            _expandedHunks.Add(row.HunkIndex);
+        }
+        else
+        {
+            _expandedHunks.Remove(row.HunkIndex);
+        }
+
+        RebuildDiffRows();
+
+        var position = $"Difference {row.HunkIndex + 1} of {_diff.Hunks.Count}";
+        var lines = _diff.Hunks[row.HunkIndex].Lines.Count;
+
+        // The row is already focused, so a screen reader will not re-read it
+        // on its own. The announcement has to carry the position itself or
+        // the user is told "expanded" with no idea what expanded.
+        return open ? $"{position} expanded, {lines} lines" : $"{position} collapsed";
     }
 
     /// <summary>

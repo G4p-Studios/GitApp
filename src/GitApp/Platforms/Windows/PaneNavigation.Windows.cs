@@ -46,7 +46,8 @@ public static partial class PaneNavigation
 
     private static void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
-        if (e.Key is not (VirtualKey.F6 or VirtualKey.F7))
+        if (e.Key is not (VirtualKey.F6 or VirtualKey.F7 or VirtualKey.Enter
+            or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left))
         {
             return;
         }
@@ -54,6 +55,28 @@ public static partial class PaneNavigation
         var shift = InputKeyboardSource
             .GetKeyStateForCurrentThread(VirtualKey.Shift)
             .HasFlag(CoreVirtualKeyStates.Down);
+
+        // Folding a difference. Enter and Space toggle, matching the
+        // expanders in Settings; Right and Left say which way they mean,
+        // matching a tree view. The handler declines whenever the cursor is
+        // not on a foldable header, so these keys behave normally
+        // everywhere else in the window.
+        if (e.Key is VirtualKey.Enter or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left)
+        {
+            var intent = e.Key switch
+            {
+                VirtualKey.Right => (bool?)true,
+                VirtualKey.Left => false,
+                _ => null,
+            };
+
+            if (Expand(intent))
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
 
         if (e.Key == VirtualKey.F6)
         {

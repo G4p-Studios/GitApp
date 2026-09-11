@@ -228,23 +228,42 @@
                    PaneId="diff" PaneName="Diff" PaneOrder="25">
             <Grid RowDefinitions="Auto,*" Padding="12">
 
-                <Label Grid.Row="0"
-                       Text="{Binding DiffSummary}"
-                       FontSize="14"
-                       Margin="0,0,0,8"
-                       SemanticProperties.HeadingLevel="Level2" />
+                <Grid Grid.Row="0" ColumnDefinitions="*,Auto,Auto"
+                      ColumnSpacing="6" Margin="0,0,0,8">
+
+                    <Label Grid.Column="0"
+                           Text="{Binding DiffSummary}"
+                           FontSize="14"
+                           VerticalOptions="Center"
+                           SemanticProperties.HeadingLevel="Level2" />
+
+                    <!--
+                      How much unchanged text surrounds each change. This is
+                      an accessibility setting, not a cosmetic one: context
+                      is what it costs to listen to a diff.
+                    -->
+                    <Label Grid.Column="1" Text="Context" FontSize="12"
+                           VerticalOptions="Center" Opacity="0.7" />
+
+                    <Picker Grid.Column="2"
+                            x:Name="ContextPicker"
+                            ItemsSource="{Binding ContextLineOptions}"
+                            SelectedItem="{Binding ContextLines, Mode=TwoWay}"
+                            WidthRequest="70"
+                            SemanticProperties.Description="Context lines around each change" />
+                </Grid>
 
                 <CollectionView Grid.Row="1"
                                 x:Name="DiffList"
                                 ItemsSource="{Binding DiffRows}"
                                 SelectionMode="Single"
-                                SemanticProperties.Description="Diff. Use up and down to move through lines, F7 and Shift F7 to move between differences.">
+                                SemanticProperties.Description="Diff. Use up and down to move through lines, F7 and Shift F7 to move between differences, Enter to expand or collapse a large difference.">
                     <CollectionView.EmptyView>
                         <Label Text="Select a file to see its changes"
                                Padding="8" FontSize="13" Opacity="0.7" />
                     </CollectionView.EmptyView>
                     <CollectionView.ItemTemplate>
-                        <DataTemplate x:DataType="vm:DiffRow">
+                        <DataTemplate x:DataType="domain:DiffRow">
                             <Grid ColumnDefinitions="44,16,*" Padding="4,1"
                                   SemanticProperties.Description="{Binding AccessibleName}">
                                 <Label Grid.Column="0"

@@ -80,6 +80,25 @@ public sealed class FocusManager
     }
 
     /// <summary>
+    /// Record that focus is now inside a pane, without disturbing where it
+    /// was last time.
+    ///
+    /// Cycling is not the only way into a pane: a mouse click, a Tab, or
+    /// F7 jumping into the diff all move focus without going through
+    /// <see cref="CyclePane"/>. Without this the manager keeps believing
+    /// focus is wherever it last put it, so the next F6 cycles from the
+    /// wrong place and any key bound to "the pane you are in" is offered to
+    /// the wrong pane.
+    /// </summary>
+    public void NoteActivePane(string id)
+    {
+        if (Find(id) is not null)
+        {
+            _activePaneId = id;
+        }
+    }
+
+    /// <summary>
     /// Record how to restore focus inside a pane. Called by the platform
     /// focus tracker as the user moves through a list.
     /// </summary>

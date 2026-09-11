@@ -185,7 +185,10 @@ Windows conventions, implemented by us because nothing implements them for us:
 - **F6 and Shift+F6** cycle panes in order: sidebar, primary content, detail
   pane, status bar. Each pane announces its name on entry. This is our substitute
   for the missing landmark support and it is mandatory on every screen.
-- **Arrow keys** move within a composite widget only.
+- **Arrow keys** move within a composite widget only. Left and Right collapse
+  and expand where a list has foldable rows, and Left from inside a folded
+  region first steps out to its header, as a tree does. The diff viewer is
+  the only such list today (`docs/DIFF-VIEWER.md`).
 - **Escape** backs out one level. It closes a menu, dialog, or filter, and always
   restores focus to the element that opened it.
 - **Applications key and Shift+F10** open the context menu for the focused item.
@@ -204,6 +207,12 @@ focused child on reactivation, but only if something held focus to begin with.
 The initial focus is deliberately silent. The screen reader already announces
 the window and the newly focused control on activation, so emitting our own
 "X pane" on top of that is duplicate speech.
+
+**Which pane is active is decided by focus, not by F6.** A mouse click, a Tab,
+or a jump key like F7 all move focus into a pane without going through the
+cycler, and a manager that only learns about F6 then cycles from the wrong
+place and offers pane-specific keys to the wrong pane. The platform focus
+tracker reports every arrival, so the two can never disagree.
 
 Focus restoration is centralized in a `FocusManager` service. Any code path that
 destroys the focused element must have pushed a restore target first. Losing
@@ -437,8 +446,8 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    and the platform focus helpers.
 2. **Local repositories.** Done. Add, remove and clone repositories, status,
    stage, unstage, commit, fetch, pull, push, history, branch switching and
-   creation, conflict resolution, and the diff viewer, all against real
-   repositories through git.exe.
+   creation, conflict resolution, and the diff viewer with folding and a
+   context setting, all against real repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code view.
 4. **GitHub write.** Comment, review, merge, release management.
 5. **Notifications.** Polling, toasts, inbox.

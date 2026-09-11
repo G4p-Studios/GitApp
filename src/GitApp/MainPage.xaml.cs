@@ -1,4 +1,5 @@
 using GitApp.Accessibility;
+using GitApp.Domain;
 using GitApp.ViewModels;
 
 namespace GitApp;
@@ -22,7 +23,9 @@ public partial class MainPage : ContentPage
         // user to their place instead of the top.
         PlatformFocus.TrackFocusWithin(RepoList, "repos");
         PlatformFocus.TrackFocusWithin(UnstagedList, "changes");
+        PlatformFocus.TrackFocusWithin(StagedList, "changes");
         PlatformFocus.TrackFocusWithin(DiffList, "diff");
+        PlatformFocus.TrackFocusWithin(CommitMessageEditor, "commit");
 
         DiffPane.EntryControl = DiffList;
 
@@ -80,7 +83,65 @@ public partial class MainPage : ContentPage
             return true;
         };
 
+        // Folding a large difference. The header keeps its row index either
+        // way, so focus stays exactly where it is and only the announcement
+        // has to be made.
+        PaneNavigation.RowExpander = open =>
+        {
+            if (FocusManager.Current.ActivePane?.Id != "diff"
+                || DiffList.SelectedItem is not DiffRow row)
+            {
+                return false;
+            }
+
+            var index = _vm.DiffRows.IndexOf(row);
+
+            // Left from inside a difference goes out to its header, the way
+            // Left walks out of a subtree. Only then does another Left fold
+            // it. Without the first step, escaping a four-hundred line block
+            // means arrowing back up through all of it.
+            if (!row.IsHeader)
+            {
+                if (open is not false)
+                {
+                    return false;
+                }
+
+                var header = _vm.FindHunkRow(index, -1);
+                return header >= 0 && MoveToDiffRow(header, _vm.DiffRows[header].AccessibleName);
+            }
+
+            if (!row.IsExpandable || _vm.ToggleHunk(index, open) is not { } announcement)
+            {
+                return false;
+            }
+
+            return MoveToDiffRow(index, announcement);
+        };
+
         PaneNavigation.Attach(this);
+    }
+
+    /// <summary>
+    /// Select, scroll to, focus and announce one diff row.
+    ///
+    /// Selecting does not focus, and focusing without saying anything reads
+    /// as the key having done nothing. Both halves are needed every time, so
+    /// they live together. Deferred a frame because a row has no container
+    /// to focus until the scroll has realized it.
+    /// </summary>
+    private bool MoveToDiffRow(int index, string announcement)
+    {
+        DiffList.SelectedItem = _vm.DiffRows[index];
+        DiffList.ScrollTo(index, position: ScrollToPosition.MakeVisible, animate: false);
+
+        Dispatcher.Dispatch(() =>
+        {
+            PlatformFocus.TryFocusSelectedItem(DiffList);
+            Announcer.Current.Announce(announcement);
+        });
+
+        return true;
     }
 
     protected override async void OnAppearing()
