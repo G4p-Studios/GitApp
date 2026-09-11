@@ -75,14 +75,23 @@ public static partial class PaneNavigation
         // matching a tree view. The handler declines whenever the cursor is
         // not on a foldable header, so these keys behave normally
         // everywhere else in the window.
-        if (e.Key is VirtualKey.Enter or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left)
+        //
+        // Enter and Space also open a folder on the repository screen.
+        // Tried after Expand so the diff viewer keeps the key when it
+        // applies, and skipped when Expand already handled it.
+        if (e.Key is VirtualKey.Enter or VirtualKey.Space)
         {
-            var intent = e.Key switch
+            if (Expand(null) || Activate())
             {
-                VirtualKey.Right => (bool?)true,
-                VirtualKey.Left => false,
-                _ => null,
-            };
+                e.Handled = true;
+            }
+
+            return;
+        }
+
+        if (e.Key is VirtualKey.Right or VirtualKey.Left)
+        {
+            var intent = e.Key == VirtualKey.Right;
 
             if (Expand(intent))
             {

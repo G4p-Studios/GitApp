@@ -108,7 +108,6 @@ that is not in the foreground: `docs/DEVELOPING.md`.
 - `docs/DIFF-VIEWER.md` — the diff viewer, and why it deviates from VS Code.
 - `docs/GITHUB.md` — sign-in, token storage, and the remote repository list.
 - `docs/REPOSITORY-VIEW.md` — the github.com-style repository screen.
-  Designed, not built.
 - `docs/DEVELOPING.md` — prerequisites, build, verification method, traps.
 - `docs/SPIKE-MAUI.md` — the measurements behind the framework choice.
 
@@ -126,8 +125,8 @@ diff viewer with folding.
 Milestone 3 is in progress: GitHub read. Sign-in by personal access token
 and the remote repository list are built and work (`docs/GITHUB.md`);
 browser sign-in is written but needs a registered OAuth client ID; the
-repository screen is designed only (`docs/REPOSITORY-VIEW.md`); issues and
-pull requests are not started.
+repository screen is built (`docs/REPOSITORY-VIEW.md`); issues, pull
+requests, and opening individual files are not started.
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

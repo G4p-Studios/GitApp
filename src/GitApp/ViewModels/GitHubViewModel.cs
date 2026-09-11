@@ -38,7 +38,7 @@ public sealed class GitHubViewModel : ObservableObject
         SignOutCommand = new AsyncCommand(SignOutAsync, () => IsSignedIn && !IsBusy);
         RefreshCommand = new AsyncCommand(LoadRepositoriesAsync, () => IsSignedIn && !IsBusy);
         CloneCommand = new AsyncCommand<GitHubRepository>(CloneAsync);
-        OpenInBrowserCommand = new AsyncCommand<GitHubRepository>(OpenInBrowserAsync);
+        OpenRepositoryCommand = new AsyncCommand<GitHubRepository>(OpenRepositoryAsync);
     }
 
     public ObservableCollection<GitHubRepository> Repositories { get; } = new();
@@ -51,7 +51,7 @@ public sealed class GitHubViewModel : ObservableObject
 
     public ICommand CloneCommand { get; }
 
-    public ICommand OpenInBrowserCommand { get; }
+    public ICommand OpenRepositoryCommand { get; }
 
     /// <summary>Set by the page, which owns the folder picker.</summary>
     public Func<Task<string?>>? PickFolder { get; set; }
@@ -422,22 +422,17 @@ public sealed class GitHubViewModel : ObservableObject
     /// </summary>
     public event EventHandler<string>? Cloned;
 
-    private async Task OpenInBrowserAsync(GitHubRepository? repo)
+    /// <summary>Open the in-app repository view, not github.com.</summary>
+    public event EventHandler<GitHubRepository>? OpenRequested;
+
+    private Task OpenRepositoryAsync(GitHubRepository? repo)
     {
-        if (repo is null || string.IsNullOrEmpty(repo.HtmlUrl))
+        if (repo is not null)
         {
-            return;
+            OpenRequested?.Invoke(this, repo);
         }
 
-        try
-        {
-            await Launcher.Default.OpenAsync(repo.HtmlUrl);
-            _announcer.Announce($"Opened {repo.FullName} in your browser");
-        }
-        catch (Exception)
-        {
-            _announcer.Announce("Could not open your browser.");
-        }
+        return Task.CompletedTask;
     }
 
     private void RaiseSignedInState()

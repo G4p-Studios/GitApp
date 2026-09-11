@@ -10,9 +10,9 @@ Account and Repositories. Escape goes back.
 
 Sign in with a personal access token, and the list of every repository the
 account owns, collaborates on, or reaches through an organization appears,
-newest activity first. Each row can be cloned straight to disk, and a clone
-started here is added to the local repository list on the main screen
-rather than left for the user to go and find.
+newest activity first. Each row can be opened in GitApp or cloned straight
+to disk, and a clone started here is added to the local repository list on
+the main screen rather than left for the user to go and find.
 
 ```
 GitApp, G4p-Studios, public, C#, 3 stars, updated 5 hours ago, Git made super simple, yet so powerful
@@ -92,14 +92,14 @@ rather than returning what arrived. A half-loaded list that claims to be
 complete is worse than an error, because the repository you wanted is
 simply absent.
 
-## REST, not GraphQL, for now
+## REST for the list, GraphQL for the repository view
 
 ARCHITECTURE 4.3 specifies GraphQL for list screens, and the reason given
 is that partial data arriving in waves re-renders a list and moves focus. A
 single REST call to `/user/repos` returns every field this screen shows in
 one response, so that reason is already met. GraphQL earns its complexity
-on the repository view, where the last commit touching each file cannot be
-had from REST in one request at all.
+on the repository view (`docs/REPOSITORY-VIEW.md`), where the last commit
+touching each file cannot be had from REST in one request at all.
 
 ## What is not verified
 

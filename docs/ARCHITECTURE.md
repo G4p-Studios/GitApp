@@ -489,9 +489,9 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    creation, conflict resolution, and the diff viewer with folding and a
    context setting, all against real repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code
-   view. Sign-in and the remote repository list are built
-   (`docs/GITHUB.md`); the repository screen is designed but not built
-   (`docs/REPOSITORY-VIEW.md`); issues and pull requests are not started.
+   view. Sign-in, the remote repository list (`docs/GITHUB.md`), and the
+   repository screen (`docs/REPOSITORY-VIEW.md`) are built. Issues, pull
+   requests, and opening individual files are not started.
 4. **GitHub write.** Comment, review, merge, release management.
 5. **Notifications.** Polling, toasts, inbox.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.

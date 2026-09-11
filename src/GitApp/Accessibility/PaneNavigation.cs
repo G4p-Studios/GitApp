@@ -29,6 +29,7 @@ public static partial class PaneNavigation
         HunkNavigator = null;
         RowExpander = null;
         BackHandler = null;
+        ActivateHandler = null;
 
         FocusManager.Current.ResetPanes();
 
@@ -69,6 +70,16 @@ public static partial class PaneNavigation
     public static Func<bool?, bool>? RowExpander { get; set; }
 
     internal static bool Expand(bool? open) => RowExpander?.Invoke(open) ?? false;
+
+    /// <summary>
+    /// Enter or Space on this screen, when it means "open the thing under
+    /// the cursor" rather than fold a difference. The file table uses this;
+    /// the diff viewer keeps RowExpander. Returns false when the key does
+    /// not apply, so a focused button or text field still receives it.
+    /// </summary>
+    public static Func<bool>? ActivateHandler { get; set; }
+
+    internal static bool Activate() => ActivateHandler?.Invoke() ?? false;
 
     /// <summary>Next pane. Bound to F6.</summary>
     public static void Next() => FocusManager.Current.CyclePane(1);

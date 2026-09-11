@@ -1,5 +1,6 @@
 using System.Net;
 using System.Net.Http.Headers;
+using System.Text;
 using System.Text.Json;
 using GitApp.Domain;
 
@@ -9,18 +10,17 @@ namespace GitApp.GitHub;
 /// The GitHub REST client.
 ///
 /// REST rather than the GraphQL the architecture note calls for, on purpose
-/// and only for now. The reason GraphQL is specified is that partial data
-/// arriving in waves re-renders a list and moves focus, and a single REST
-/// call to /user/repos returns every field this screen shows in one
-/// response, so that reason is already satisfied. GraphQL earns its
-/// complexity on the repository view, where the last commit touching each
-/// file cannot be had from REST in one request at all
-/// (docs/REPOSITORY-VIEW.md).
+/// and only for the repository list. The reason GraphQL is specified is that
+/// partial data arriving in waves re-renders a list and moves focus, and a
+/// single REST call to /user/repos returns every field that screen shows in
+/// one response, so that reason is already satisfied. The repository view
+/// is GraphQL, because last-touch per file cannot be had from REST in one
+/// request at all (docs/REPOSITORY-VIEW.md).
 ///
 /// Everything normalizes into <c>GitApp.Domain</c> records at this boundary.
 /// No screen ever sees a GitHub-shaped object.
 /// </summary>
-public sealed class GitHubClient : IDisposable
+public sealed partial class GitHubClient : IDisposable
 {
     private const string ApiRoot = "https://api.github.com";
 
@@ -167,13 +167,18 @@ public sealed class GitHubClient : IDisposable
         return repos;
     }
 
-    private async Task<GitHubResult<string>> GetAsync(string url, CancellationToken ct)
+    private Task<GitHubResult<string>> GetAsync(string url, CancellationToken ct) =>
+        SendAsync(HttpMethod.Get, url, null, ct);
+
+    private async Task<GitHubResult<string>> SendAsync(
+        HttpMethod method, string url, HttpContent? body, CancellationToken ct)
     {
         HttpResponseMessage response;
 
         try
         {
-            response = await _http.GetAsync(url, ct);
+            using var request = new HttpRequestMessage(method, url) { Content = body };
+            response = await _http.SendAsync(request, ct);
         }
         catch (TaskCanceledException) when (!ct.IsCancellationRequested)
         {
@@ -289,22 +294,22 @@ public sealed class GitHubClient : IDisposable
             _ => GitHubFailure.Other,
         };
 
-    private static string? String(JsonElement element, string name) =>
+    internal static string? String(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.String
             ? value.GetString()
             : null;
 
-    private static bool Bool(JsonElement element, string name) =>
+    internal static bool Bool(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value) && value.ValueKind == JsonValueKind.True;
 
-    private static int Int(JsonElement element, string name) =>
+    internal static int Int(JsonElement element, string name) =>
         element.TryGetProperty(name, out var value)
         && value.ValueKind == JsonValueKind.Number
         && value.TryGetInt32(out var number)
             ? number
             : 0;
 
-    private static DateTimeOffset? Date(JsonElement element, string name) =>
+    internal static DateTimeOffset? Date(JsonElement element, string name) =>
         String(element, name) is { } text
         && DateTimeOffset.TryParse(text, out var parsed)
             ? parsed

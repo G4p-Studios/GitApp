@@ -1,4 +1,5 @@
 using GitApp.Accessibility;
+using GitApp.Domain;
 using GitApp.GitHub;
 using GitApp.Services;
 using GitApp.ViewModels;
@@ -7,6 +8,7 @@ namespace GitApp;
 
 public partial class GitHubPage : ContentPage
 {
+    private readonly GitHubSession _session;
     private readonly GitHubViewModel _vm;
     private bool _initialised;
 
@@ -14,6 +16,7 @@ public partial class GitHubPage : ContentPage
     {
         InitializeComponent();
 
+        _session = session;
         _vm = new GitHubViewModel(session);
         BindingContext = _vm;
 
@@ -26,12 +29,8 @@ public partial class GitHubPage : ContentPage
 
         _vm.PickFolder = FolderPicker.PickAsync;
 
-        Announcer.Current.StatusChanged += OnStatusChanged;
-
-        // A clone started here belongs in the local list on the other
-        // screen. Cloning something and then having to go and find it by
-        // hand is the sort of gap that only shows up in real use.
         _vm.Cloned += (_, path) => Cloned?.Invoke(this, path);
+        _vm.OpenRequested += (_, repo) => ShowRepository(repo);
     }
 
     /// <summary>Raised so the main screen can add the new clone.</summary>
@@ -43,6 +42,9 @@ public partial class GitHubPage : ContentPage
     protected override void OnAppearing()
     {
         base.OnAppearing();
+
+        Announcer.Current.StatusChanged -= OnStatusChanged;
+        Announcer.Current.StatusChanged += OnStatusChanged;
 
         PaneNavigation.Attach(this);
         PaneNavigation.BackHandler = () =>
@@ -107,4 +109,11 @@ public partial class GitHubPage : ContentPage
 
     private async void OnBrowserSignIn(object? sender, EventArgs e) =>
         await _vm.StartBrowserSignInAsync();
+
+    private void ShowRepository(GitHubRepository repo)
+    {
+        var page = new RepositoryPage(_session, repo);
+        page.Cloned += (_, path) => Cloned?.Invoke(this, path);
+        AppNavigator.Show(page);
+    }
 }
