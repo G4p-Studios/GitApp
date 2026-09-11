@@ -17,6 +17,10 @@ namespace GitApp.Platforms.Windows;
 /// preview-key tunnel. RichEditBox is in that tree, so F6 still cycles
 /// panes, and it is the same caret-reading shape as Notepad. Hyperlinks
 /// stay in the sentence via <c>ITextRange.Link</c>; they are not buttons.
+///
+/// Setting <c>Link</c> on a relative URL or a zero-length range is a
+/// known WinUI crash. Ranges are clamped, relative destinations are
+/// resolved, and a failure to format one run must not take down the page.
 /// </summary>
 public sealed class MarkdownDocumentViewHandler
     : ViewHandler<MarkdownDocumentView, RichEditBox>
@@ -44,7 +48,6 @@ public sealed class MarkdownDocumentViewHandler
             AcceptsReturn = true,
             TextWrapping = Microsoft.UI.Xaml.TextWrapping.Wrap,
             BorderThickness = new Microsoft.UI.Xaml.Thickness(0),
-            Background = null,
             Padding = new Microsoft.UI.Xaml.Thickness(0),
         };
 
@@ -71,6 +74,19 @@ public sealed class MarkdownDocumentViewHandler
             return;
         }
 
+        try
+        {
+            WriteDocument(box, view);
+        }
+        catch
+        {
+            // A formatting failure must not close the repository. The
+            // plain text is already in the control if SetText succeeded.
+        }
+    }
+
+    private static void WriteDocument(RichEditBox box, MarkdownDocumentView view)
+    {
         var layout = MarkdownDocument.Layout(
             view.Blocks,
             view.ShowTitleInDocument ? view.Title : null,
@@ -79,51 +95,78 @@ public sealed class MarkdownDocumentViewHandler
         WinAutomation.SetName(box, name);
 
         box.IsReadOnly = false;
-        box.Document.SetText(TextSetOptions.None, layout.Text);
+        box.Document.SetText(TextSetOptions.None, layout.Text ?? string.Empty);
+        box.Document.GetText(TextGetOptions.None, out var story);
+        var storyEnd = Math.Max(0, story.Length);
 
         foreach (var range in layout.Ranges)
         {
-            ApplyRange(box, range, links: false);
+            ApplyRange(box, range, view.BaseUri, storyEnd, links: false);
         }
 
         foreach (var range in layout.Ranges)
         {
-            ApplyRange(box, range, links: true);
+            ApplyRange(box, range, view.BaseUri, storyEnd, links: true);
         }
 
         box.Document.Selection.SetRange(0, 0);
         box.IsReadOnly = true;
     }
 
-    private static void ApplyRange(RichEditBox box, MarkdownRange range, bool links)
+    private static void ApplyRange(
+        RichEditBox box,
+        MarkdownRange range,
+        string? baseUri,
+        int storyEnd,
+        bool links)
     {
-        if (range.Length <= 0 || range.Start < 0)
-        {
-            return;
-        }
-
         var isLink = range.Kind == MarkdownRangeKind.Link;
         if (isLink != links)
         {
             return;
         }
 
-        var run = box.Document.GetRange(range.Start, range.Start + range.Length);
-        switch (range.Kind)
+        var start = range.Start;
+        var end = range.Start + range.Length;
+        if (start < 0 || end <= start || start >= storyEnd)
         {
-            case MarkdownRangeKind.Heading:
-                run.CharacterFormat.Bold = FormatEffect.On;
-                run.CharacterFormat.Size = HeadingSize(range.Level);
-                break;
+            return;
+        }
 
-            case MarkdownRangeKind.Code:
-                run.CharacterFormat.Name = "Consolas";
-                run.CharacterFormat.Size = 13;
-                break;
+        end = Math.Min(end, storyEnd);
 
-            case MarkdownRangeKind.Link when !string.IsNullOrEmpty(range.Url):
-                run.Link = "\"" + range.Url.Replace("\"", string.Empty) + "\"";
-                break;
+        try
+        {
+            var run = box.Document.GetRange(start, end);
+            if (run.StartPosition >= run.EndPosition)
+            {
+                return;
+            }
+
+            switch (range.Kind)
+            {
+                case MarkdownRangeKind.Heading:
+                    run.CharacterFormat.Bold = FormatEffect.On;
+                    run.CharacterFormat.Size = HeadingSize(range.Level);
+                    break;
+
+                case MarkdownRangeKind.Code:
+                    run.CharacterFormat.Name = "Consolas";
+                    run.CharacterFormat.Size = 13;
+                    break;
+
+                case MarkdownRangeKind.Link:
+                    if (MarkdownDocument.TryHyperlink(range.Url, baseUri, out var url))
+                    {
+                        run.Link = "\"" + url.Replace("\"", string.Empty) + "\"";
+                    }
+
+                    break;
+            }
+        }
+        catch
+        {
+            // One bad run is not worth the repository screen.
         }
     }
 
@@ -134,14 +177,21 @@ public sealed class MarkdownDocumentViewHandler
             return;
         }
 
-        var link = PlatformView.Document.Selection.Link;
-        if (string.IsNullOrEmpty(link))
+        try
         {
-            return;
-        }
+            var link = PlatformView.Document.Selection.Link;
+            if (string.IsNullOrEmpty(link))
+            {
+                return;
+            }
 
-        e.Handled = true;
-        VirtualView.RaiseLink(link.Trim().Trim('"'));
+            e.Handled = true;
+            VirtualView.RaiseLink(link.Trim().Trim('"'));
+        }
+        catch
+        {
+            // Reading the caret's link is best-effort.
+        }
     }
 
     private static float HeadingSize(int level) => level switch

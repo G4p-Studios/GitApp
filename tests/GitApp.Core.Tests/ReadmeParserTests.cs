@@ -69,14 +69,37 @@ public class ReadmeParserTests
     }
 
     [Fact]
-    public void RelativeUrlsResolveAgainstTheFileTheyCameFrom()
+    public void RelativeUrlsAreNotSafeHyperlinksUntilResolved()
     {
+        Assert.False(MarkdownDocument.TryHyperlink("docs/ARCHITECTURE.md", null, out _));
+        Assert.True(MarkdownDocument.TryHyperlink(
+            "docs/ARCHITECTURE.md",
+            "https://github.com/G4p-Studios/GitApp/blob/main/",
+            out var absolute));
         Assert.Equal(
-            "https://example.com/contributing",
-            MarkdownDocument.ResolveUrl("https://example.com/contributing", "https://github.com/a/b/blob/main/"));
-        Assert.Equal(
-            "https://github.com/a/b/blob/main/docs/guide.md",
-            MarkdownDocument.ResolveUrl("docs/guide.md", "https://github.com/a/b/blob/main/"));
+            "https://github.com/G4p-Studios/GitApp/blob/main/docs/ARCHITECTURE.md",
+            absolute);
+    }
+
+    [Fact]
+    public void ARealReadmeLayoutHasNoEmptyLinkRanges()
+    {
+        var markdown = """
+            # GitApp
+
+            See [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md) and [AGENTS.md](AGENTS.md).
+            """;
+
+        var layout = MarkdownDocument.Layout(ReadmeDocument.Parse(markdown), title: "README.md");
+        Assert.Equal(2, layout.Ranges.Count(r => r.Kind == MarkdownRangeKind.Link));
+        Assert.All(
+            layout.Ranges,
+            range =>
+            {
+                Assert.True(range.Length > 0);
+                Assert.True(range.Start >= 0);
+                Assert.True(range.Start + range.Length <= layout.Text.Length);
+            });
     }
 
     [Fact]

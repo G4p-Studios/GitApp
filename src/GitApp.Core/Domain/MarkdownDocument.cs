@@ -115,6 +115,22 @@ public static class MarkdownDocument
         return url;
     }
 
+    /// <summary>
+    /// RichEdit's <c>Link</c> property crashes the process on a relative
+    /// URL or a degenerate range. Only absolute http(s) or mailto values
+    /// are safe to hand it.
+    /// </summary>
+    public static bool TryHyperlink(string? url, string? baseUri, out string absolute)
+    {
+        absolute = ResolveUrl(url ?? string.Empty, baseUri);
+        if (!Uri.TryCreate(absolute, UriKind.Absolute, out var uri))
+        {
+            return false;
+        }
+
+        return uri.Scheme is "http" or "https" or "mailto";
+    }
+
     private static void AppendHeading(
         StringBuilder text, List<MarkdownRange> ranges, string heading, int level)
     {
