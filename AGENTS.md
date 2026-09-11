@@ -72,8 +72,9 @@ Warnings are errors in practice: the tree is at zero and should stay there.
   who cannot glance at the window. `RepositoryStore.LoadError` is the
   pattern.
 - **F6 cycles panes**; F7 moves between differences; Enter, Space, Left and
-  Right fold; Escape backs out. Pane order leaves gaps (10, 20, 25, 30) so
-  panes can be inserted.
+  Right fold; Escape backs out; Control+Enter posts what is being written
+  (`PaneNavigation.SubmitHandler`). Pane order leaves gaps (10, 20, 25,
+  30) so panes can be inserted.
 - **A screen owns its panes and its keys.** `PaneNavigation.Attach(page)`
   runs on every appearance, clears the pane registry and the key handlers,
   and refills them from that page. Registering panes on a load event is not
@@ -128,6 +129,10 @@ and the remote repository list are built and work (`docs/GITHUB.md`);
 browser sign-in is written but needs a registered OAuth client ID; the
 repository screen and file view are built (`docs/REPOSITORY-VIEW.md`);
 issues and pull requests are built (`docs/ISSUES.md`).
+
+Milestone 4, GitHub write, has started: commenting on issues and pull
+requests is built (`docs/ISSUES.md`, "Writing a comment"). Review, merge
+and releases are not.
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

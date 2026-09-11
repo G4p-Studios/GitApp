@@ -65,6 +65,7 @@ public sealed partial class GitHubClient
         query IssueDetail($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
             issue(number: $number) {
+              id
               number
               title
               state
@@ -93,6 +94,7 @@ public sealed partial class GitHubClient
         query PullDetail($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
             pullRequest(number: $number) {
+              id
               number
               title
               state
@@ -357,10 +359,7 @@ public sealed partial class GitHubClient
             {
                 foreach (var comment in commentNodes.EnumerateArray())
                 {
-                    comments.Add(new GitHubComment(
-                        ActorLogin(comment),
-                        Date(comment, "createdAt") ?? DateTimeOffset.UtcNow,
-                        String(comment, "body") ?? string.Empty));
+                    comments.Add(ReadComment(comment));
                 }
             }
         }
@@ -390,8 +389,14 @@ public sealed partial class GitHubClient
             ChangedFiles: Int(node, "changedFiles"),
             Additions: Int(node, "additions"),
             Deletions: Int(node, "deletions"),
-            Mergeable: String(node, "mergeable"));
+            Mergeable: String(node, "mergeable"),
+            NodeId: String(node, "id"));
     }
+
+    internal static GitHubComment ReadComment(JsonElement comment) => new(
+        ActorLogin(comment),
+        Date(comment, "createdAt") ?? DateTimeOffset.UtcNow,
+        String(comment, "body") ?? string.Empty);
 
     internal static GitHubWorkItem? ReadWorkItem(JsonElement node, GitHubWorkKind kind)
     {

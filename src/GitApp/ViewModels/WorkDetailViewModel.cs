@@ -17,6 +17,7 @@ public sealed class WorkDetailViewModel : ObservableObject
     private string _title;
     private string _metadata = string.Empty;
     private string _commentsHeading = "Comments";
+    private string _draft = string.Empty;
     private bool _isBusy;
     private GitHubWorkDetail? _detail;
     private IReadOnlyList<ReadmeBlock> _bodyBlocks = Array.Empty<ReadmeBlock>();
@@ -34,11 +35,35 @@ public sealed class WorkDetailViewModel : ObservableObject
         _title = item.Title;
         _metadata = item.AccessibleName;
         OpenOnGitHubCommand = new AsyncCommand(OpenOnGitHubAsync);
+        PostCommentCommand = new AsyncCommand(PostCommentAsync, () => CanPost);
     }
 
     public System.Windows.Input.ICommand OpenOnGitHubCommand { get; }
 
+    public AsyncCommand PostCommentCommand { get; }
+
     public event EventHandler? ConversationChanged;
+
+    /// <summary>Raised after a comment is posted, with the comment appended.</summary>
+    public event EventHandler<GitHubComment>? CommentPosted;
+
+    /// <summary>The comment being written. Never cleared on failure.</summary>
+    public string Draft
+    {
+        get => _draft;
+        set
+        {
+            if (Set(ref _draft, value))
+            {
+                Raise(nameof(HasDraft));
+                PostCommentCommand.RaiseCanExecuteChanged();
+            }
+        }
+    }
+
+    public bool HasDraft => !string.IsNullOrWhiteSpace(_draft);
+
+    public bool CanPost => HasDraft && !_isBusy && _detail is { CanComment: true };
 
     public GitHubWorkKind Kind => _listedItem.Kind;
 
@@ -65,7 +90,13 @@ public sealed class WorkDetailViewModel : ObservableObject
     public bool IsBusy
     {
         get => _isBusy;
-        private set => Set(ref _isBusy, value);
+        private set
+        {
+            if (Set(ref _isBusy, value))
+            {
+                PostCommentCommand.RaiseCanExecuteChanged();
+            }
+        }
     }
 
     public GitHubWorkDetail? Detail => _detail;
@@ -119,6 +150,60 @@ public sealed class WorkDetailViewModel : ObservableObject
         {
             client.Dispose();
             _announcer.ClearStatus();
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Post the draft. The draft survives a failure, because the one
+    /// thing worse than a comment that did not post is a comment that
+    /// did not post and is gone.
+    /// </summary>
+    public async Task PostCommentAsync()
+    {
+        if (!HasDraft)
+        {
+            _announcer.Announce("Write a comment first.");
+            return;
+        }
+
+        if (_detail is not { CanComment: true } detail)
+        {
+            _announcer.Announce("The conversation has not loaded yet.");
+            return;
+        }
+
+        if (_session.CreateClient() is not { } client)
+        {
+            _announcer.Announce("Sign in to GitHub first.", Urgency.Assertive);
+            return;
+        }
+
+        IsBusy = true;
+        var done = _announcer.Operation("Posting comment");
+
+        try
+        {
+            var result = await client.AddCommentAsync(detail.NodeId!, _draft.Trim());
+
+            if (!result.Success)
+            {
+                done(result.Error!);
+                return;
+            }
+
+            _detail = detail.WithComment(result.Value!);
+            CommentsHeading = _detail.CommentsHeading;
+            Draft = string.Empty;
+
+            Raise(nameof(Detail));
+            Raise(nameof(AboutFacts));
+            CommentPosted?.Invoke(this, result.Value!);
+            done($"Comment posted. {_detail.CommentsHeading}.");
+        }
+        finally
+        {
+            client.Dispose();
             IsBusy = false;
         }
     }

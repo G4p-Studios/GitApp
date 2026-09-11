@@ -160,9 +160,25 @@ public sealed record GitHubWorkDetail(
     int ChangedFiles = 0,
     int Additions = 0,
     int Deletions = 0,
-    string? Mergeable = null)
+    string? Mergeable = null,
+    string? NodeId = null)
 {
     public string Title => Item.Title;
+
+    /// <summary>Whether a comment can be posted: GitHub needs the node id.</summary>
+    public bool CanComment => !string.IsNullOrEmpty(NodeId);
+
+    /// <summary>
+    /// The conversation with one more comment at the end, after posting.
+    /// Appending what GitHub returned is how github.com behaves too: the
+    /// new comment appears where you were, and nothing above it moves.
+    /// </summary>
+    public GitHubWorkDetail WithComment(GitHubComment comment) => this with
+    {
+        Comments = Comments.Append(comment).ToList(),
+        CommentTotal = CommentTotal + 1,
+        Item = Item with { CommentCount = Item.CommentCount + 1 },
+    };
 
     public string Metadata
     {

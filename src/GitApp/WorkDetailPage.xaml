@@ -8,11 +8,12 @@
              Title="Conversation">
 
     <!--
-      Two panes, cycled with F6: Conversation and About.
+      Three panes, cycled with F6: Conversation, Comment, About.
 
       The conversation is a document, not a list: the title is a heading,
       each comment is a heading, and the bodies are rendered Markdown so
-      a screen reader can jump by heading. See docs/ISSUES.md.
+      a screen reader can jump by heading. The comment box sits under it,
+      where github.com puts it. See docs/ISSUES.md.
     -->
 
     <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="*,280">
@@ -30,8 +31,10 @@
                     SemanticProperties.Hint="Opens this conversation in your browser" />
         </HorizontalStackLayout>
 
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*,Auto">
+
         <a11y:Pane x:Name="ConversationPane"
-                   Grid.Row="1" Grid.Column="0"
+                   Grid.Row="0"
                    PaneId="work-conversation" PaneName="Conversation" PaneOrder="10">
             <ScrollView Padding="12">
                 <VerticalStackLayout x:Name="ConversationContent" Spacing="10">
@@ -53,6 +56,42 @@
                 </VerticalStackLayout>
             </ScrollView>
         </a11y:Pane>
+
+        <!--
+          Writing a comment. Its own pane so F6 reaches the editor
+          directly instead of arrowing to the end of a long conversation.
+          Order 15: between the conversation and About, the same top-to-
+          bottom order as the web page.
+        -->
+        <a11y:Pane x:Name="CommentPane"
+                   Grid.Row="1"
+                   PaneId="work-comment" PaneName="Comment" PaneOrder="15">
+            <Grid RowDefinitions="Auto,Auto,Auto" Padding="12" RowSpacing="6">
+                <Label Grid.Row="0"
+                       x:Name="CommentHeading"
+                       Text="Add a comment"
+                       FontSize="16"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <Editor Grid.Row="1"
+                        x:Name="CommentEditor"
+                        Text="{Binding Draft, Mode=TwoWay}"
+                        HeightRequest="96"
+                        AutoSize="Disabled"
+                        Placeholder="Write in Markdown"
+                        SemanticProperties.Description="Comment"
+                        SemanticProperties.Hint="Markdown. Control Enter posts." />
+
+                <Button Grid.Row="2"
+                        Text="Post comment"
+                        Command="{Binding PostCommentCommand}"
+                        HorizontalOptions="Start"
+                        MinimumHeightRequest="32"
+                        SemanticProperties.Hint="Control Enter in the comment does the same" />
+            </Grid>
+        </a11y:Pane>
+
+        </Grid>
 
         <a11y:Pane x:Name="AboutPane"
                    Grid.Row="1" Grid.Column="1"

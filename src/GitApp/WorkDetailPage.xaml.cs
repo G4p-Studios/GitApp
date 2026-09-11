@@ -20,9 +20,11 @@ public partial class WorkDetailPage : ContentPage
         Title = $"{item.KindWord} {item.Number}";
 
         ConversationPane.EntryControl = TitleLabel;
+        CommentPane.EntryControl = CommentEditor;
         AboutPane.EntryControl = AboutHeading;
 
         _vm.ConversationChanged += (_, _) => Dispatcher.Dispatch(Render);
+        _vm.CommentPosted += (_, comment) => Dispatcher.Dispatch(() => AddComment(comment));
     }
 
     protected override void OnAppearing()
@@ -34,6 +36,7 @@ public partial class WorkDetailPage : ContentPage
 
         PaneNavigation.Attach(this);
         PaneNavigation.BackHandler = HandleBack;
+        PaneNavigation.SubmitHandler = HandleSubmit;
 
         PaneNavigation.FocusFirstPaneWhenReady(this, announce: true);
 
@@ -63,7 +66,50 @@ public partial class WorkDetailPage : ContentPage
     private void OnStatusChanged(object? sender, string text) =>
         Dispatcher.Dispatch(() => StatusLabel.Text = text);
 
+    /// <summary>
+    /// Control+Enter anywhere on this screen posts the draft. Only when the
+    /// editor has focus: from the conversation it would post something the
+    /// user cannot see they are posting.
+    /// </summary>
+    private bool HandleSubmit()
+    {
+        if (!CommentEditor.IsFocused)
+        {
+            return false;
+        }
+
+        _vm.PostCommentCommand.Execute(null);
+        return true;
+    }
+
     private bool HandleBack()
+    {
+        // Escape with an unposted comment must not throw the comment away
+        // silently. Ask, in a dialog the screen reader reads on its own.
+        if (_vm.HasDraft)
+        {
+            _ = ConfirmLeaveAsync();
+            return true;
+        }
+
+        return GoBackToList();
+    }
+
+    private async Task ConfirmLeaveAsync()
+    {
+        var leave = await DisplayAlertAsync(
+            "Unposted comment",
+            "Your comment has not been posted. Leave without posting it?",
+            "Leave",
+            "Stay");
+
+        if (leave)
+        {
+            GoBackToList();
+        }
+    }
+
+    private bool GoBackToList()
     {
         if (AppNavigator.GoBack())
         {
@@ -102,26 +148,7 @@ public partial class WorkDetailPage : ContentPage
         {
             foreach (var comment in detail.Comments)
             {
-                var heading = new Label
-                {
-                    Text = comment.Heading,
-                    FontSize = 16,
-                };
-                SemanticProperties.SetDescription(heading, comment.Heading);
-                SemanticProperties.SetHeadingLevel(heading, SemanticHeadingLevel.Level3);
-                CommentsHost.Children.Add(heading);
-
-                var blocks = ReadmeDocument.Parse(comment.BodyMarkdown);
-                if (blocks.Count == 0)
-                {
-                    var blank = new Label { Text = "Empty comment.", FontSize = 14, Opacity = 0.7 };
-                    SemanticProperties.SetDescription(blank, "Empty comment.");
-                    CommentsHost.Children.Add(blank);
-                }
-                else
-                {
-                    CommentsHost.Children.Add(CreateDocument(blocks, headingOffset: 2));
-                }
+                AddComment(comment);
             }
 
             foreach (var fact in detail.AboutFacts)
@@ -130,6 +157,35 @@ public partial class WorkDetailPage : ContentPage
                 SemanticProperties.SetDescription(label, fact);
                 AboutFactsHost.Children.Add(label);
             }
+        }
+    }
+
+    /// <summary>
+    /// One comment at the end of the conversation. Also how a comment the
+    /// user just posted arrives: appended, not re-rendered, so nothing
+    /// above it moves and focus stays in the editor.
+    /// </summary>
+    private void AddComment(GitHubComment comment)
+    {
+        var heading = new Label
+        {
+            Text = comment.Heading,
+            FontSize = 16,
+        };
+        SemanticProperties.SetDescription(heading, comment.Heading);
+        SemanticProperties.SetHeadingLevel(heading, SemanticHeadingLevel.Level3);
+        CommentsHost.Children.Add(heading);
+
+        var blocks = ReadmeDocument.Parse(comment.BodyMarkdown);
+        if (blocks.Count == 0)
+        {
+            var blank = new Label { Text = "Empty comment.", FontSize = 14, Opacity = 0.7 };
+            SemanticProperties.SetDescription(blank, "Empty comment.");
+            CommentsHost.Children.Add(blank);
+        }
+        else
+        {
+            CommentsHost.Children.Add(CreateDocument(blocks, headingOffset: 2));
         }
     }
 

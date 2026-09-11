@@ -70,6 +70,21 @@ public static partial class PaneNavigation
             .GetKeyStateForCurrentThread(VirtualKey.Shift)
             .HasFlag(CoreVirtualKeyStates.Down);
 
+        // Control+Enter posts a comment from inside the editor. Checked
+        // before plain Enter, and handled so the editor does not also
+        // insert a line break into the text that was just sent.
+        if (e.Key == VirtualKey.Enter
+            && InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
+                .HasFlag(CoreVirtualKeyStates.Down))
+        {
+            if (Submit())
+            {
+                e.Handled = true;
+            }
+
+            return;
+        }
+
         // Folding a difference. Enter and Space toggle, matching the
         // expanders in Settings; Right and Left say which way they mean,
         // matching a tree view. The handler declines whenever the cursor is

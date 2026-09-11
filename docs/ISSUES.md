@@ -1,7 +1,8 @@
 # Issues and pull requests
 
-Status: built and verified with a real account, 2026-09-11. Part of
-milestone 3. Read only: commenting, reviewing and merging are milestone 4.
+Status: reading built and verified with a real account, 2026-09-11
+(milestone 3). Commenting is built and not yet verified live (milestone
+4, first slice). Reviewing and merging are not built.
 
 From the repository screen, Issues and Pull requests are their own lists,
 the way they are tabs on github.com. Putting them in the Files/Readme/About
@@ -53,7 +54,7 @@ Enter, Space, or a click opens the conversation.
 
 ## The conversation
 
-Two panes: Conversation and About.
+Three panes: Conversation, Comment, About.
 
 The conversation is a document, not a list. The title is heading 1, each
 comment is heading 3 under a heading 2 "Comments", and the bodies are the
@@ -68,8 +69,42 @@ are said, because an empty sidebar is indistinguishable from a missing one.
 
 Review threads, files changed as a list, and the timeline of label-and-
 assignment events are not in this slice. The conversation and the merge
-facts are what you open a pull request to read. Writing a comment or a
-review is milestone 4.
+facts are what you open a pull request to read.
+
+## Writing a comment
+
+The comment box is its own pane, under the conversation where github.com
+puts it, and before About in the F6 order so the cycle reads top to
+bottom like the page. Its own pane because the alternative is arrowing
+to the end of a long conversation to find the editor; F6 twice from the
+title is the same distance on every issue.
+
+The editor is a plain multi-line text field named "Comment", with the
+hint "Markdown. Control Enter posts." Control+Enter posts from inside the
+editor, the same key github.com uses, and only while the editor has focus:
+from the conversation it would post something the user cannot see they
+are posting. The Post comment button does the same for anyone who
+prefers a button, and is disabled while the draft is blank or a post is
+in flight.
+
+Posting announces `Posting comment` and then `Comment posted. 3
+comments.` The new comment is appended to the conversation from what the
+mutation returned, not by reloading: a reload re-renders every comment
+above it, and a re-render under a screen reader is a screen that went
+quiet and started over. Focus stays in the now-empty editor.
+
+A failed post announces GitHub's reason and leaves the draft exactly as
+it was. The one thing worse than a comment that did not post is a comment
+that did not post and is gone. The same rule governs Escape: with an
+unposted draft, Escape asks "Leave without posting it?" in a dialog
+rather than backing out silently. Leave and Stay are the two answers;
+Stay is the default the dialog's own Escape gives.
+
+The mutation is GraphQL `addComment`, keyed by the node id fetched with
+the conversation. A fine-grained token needs the Issues and Pull
+requests permissions set to read and write; without them GitHub replies
+"Resource not accessible by personal access token", which is spoken as
+is.
 
 ## GraphQL
 

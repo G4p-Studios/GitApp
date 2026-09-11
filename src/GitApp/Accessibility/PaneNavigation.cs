@@ -30,6 +30,7 @@ public static partial class PaneNavigation
         RowExpander = null;
         BackHandler = null;
         ActivateHandler = null;
+        SubmitHandler = null;
 
         FocusManager.Current.ResetPanes();
 
@@ -80,6 +81,16 @@ public static partial class PaneNavigation
     public static Func<bool>? ActivateHandler { get; set; }
 
     internal static bool Activate() => ActivateHandler?.Invoke() ?? false;
+
+    /// <summary>
+    /// Control+Enter: post what is being written, from inside the text
+    /// field, without tabbing to the button. The convention github.com
+    /// uses in its own comment box, so the habit transfers. Returns false
+    /// when nothing on this screen is being written.
+    /// </summary>
+    public static Func<bool>? SubmitHandler { get; set; }
+
+    internal static bool Submit() => SubmitHandler?.Invoke() ?? false;
 
     /// <summary>Next pane. Bound to F6.</summary>
     public static void Next() => FocusManager.Current.CyclePane(1);

@@ -75,6 +75,7 @@ public class IssueTests
           "data": {
             "repository": {
               "issue": {
+                "id": "I_kwDOAbc123",
                 "number": 17,
                 "title": "Fold large differences",
                 "state": "OPEN",
@@ -246,6 +247,120 @@ public class IssueTests
         Assert.True(list!.Truncated);
         Assert.Equal(400, list.TotalCount);
         Assert.Single(list.Items);
+    }
+
+    [Fact]
+    public void TheDetailCarriesTheNodeIdACommentNeeds()
+    {
+        var detail = GitHubClient.ParseIssueDetail(IssueDetail)!;
+
+        Assert.Equal("I_kwDOAbc123", detail.NodeId);
+        Assert.True(detail.CanComment);
+    }
+
+    [Fact]
+    public void ADetailWithoutANodeIdCannotBeCommentedOn()
+    {
+        var json = """{ "data": { "repository": { "issue": { "number": 1, "title": "T", "state": "OPEN" } } } }""";
+
+        Assert.False(GitHubClient.ParseIssueDetail(json)!.CanComment);
+    }
+
+    [Fact]
+    public void APostedCommentIsAppendedAndTheHeadingCountsIt()
+    {
+        var detail = GitHubClient.ParseIssueDetail(IssueDetail)!;
+
+        var after = detail.WithComment(new GitHubComment("alexoloopios", DateTimeOffset.UtcNow, "Done."));
+
+        Assert.Equal(2, after.Comments.Count);
+        Assert.Equal("Done.", after.Comments[^1].BodyMarkdown);
+        Assert.Equal("2 comments", after.CommentsHeading);
+        Assert.Equal(2, after.Item.CommentCount);
+        Assert.Single(detail.Comments);
+    }
+
+    [Fact]
+    public void TheMutationReplyBecomesAComment()
+    {
+        var json = """
+            { "data": { "addComment": { "commentEdge": { "node": {
+              "author": { "login": "alexoloopios" },
+              "createdAt": "2026-09-11T17:00:00Z",
+              "body": "Fixed in 1aabfb0."
+            } } } } }
+            """;
+
+        var comment = GitHubClient.ParseAddedComment(json);
+
+        Assert.NotNull(comment);
+        Assert.Equal("alexoloopios", comment!.Author);
+        Assert.Equal("Fixed in 1aabfb0.", comment.BodyMarkdown);
+        Assert.StartsWith("alexoloopios,", comment.Heading);
+    }
+
+    [Fact]
+    public void AReplyWithoutTheCommentIsNullNotAnEmptyComment()
+    {
+        Assert.Null(GitHubClient.ParseAddedComment("""{ "data": { "addComment": null } }"""));
+    }
+
+    [Fact]
+    public async Task AddCommentSendsTheSubjectAndBodyAndReturnsTheComment()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """
+                { "data": { "addComment": { "commentEdge": { "node": {
+                  "author": { "login": "alexoloopios" },
+                  "createdAt": "2026-09-11T17:00:00Z",
+                  "body": "Looks right."
+                } } } } }
+                """);
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.AddCommentAsync("I_kwDOAbc123", "Looks right.");
+
+        Assert.True(result.Success);
+        Assert.Equal("Looks right.", result.Value!.BodyMarkdown);
+        Assert.Contains("addComment", sent);
+        Assert.Contains("\"subjectId\":\"I_kwDOAbc123\"", sent);
+        Assert.Contains("\"body\":\"Looks right.\"", sent);
+    }
+
+    [Fact]
+    public async Task ARefusedCommentIsASpokenFailureWithTheScopeHint()
+    {
+        var handler = new ScriptedHandler(_ => Json(HttpStatusCode.OK, """
+            {
+              "data": { "addComment": null },
+              "errors": [
+                { "type": "FORBIDDEN", "message": "Resource not accessible by personal access token" }
+              ]
+            }
+            """));
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.AddCommentAsync("I_kwDOAbc123", "Hello");
+
+        Assert.False(result.Success);
+        Assert.Equal(GitHubFailure.Forbidden, result.Failure);
+        Assert.Contains("not accessible", result.Error);
+    }
+
+    [Fact]
+    public async Task AnUnconfirmedCommentSaysToCheckRatherThanClaimingSuccess()
+    {
+        var handler = new ScriptedHandler(_ => Json(HttpStatusCode.OK, """{ "data": { "addComment": {} } }"""));
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.AddCommentAsync("I_kwDOAbc123", "Hello");
+
+        Assert.False(result.Success);
+        Assert.Contains("check whether it was posted", result.Error);
     }
 
     private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
