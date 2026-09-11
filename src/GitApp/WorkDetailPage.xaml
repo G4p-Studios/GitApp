@@ -29,6 +29,19 @@
                     Command="{Binding OpenOnGitHubCommand}"
                     MinimumHeightRequest="32"
                     SemanticProperties.Hint="Opens this conversation in your browser" />
+            <!--
+              "Close issue" or "Reopen issue": one button whose name says
+              which. Hidden once merged, because merged is final.
+            -->
+            <Button Text="{Binding StateActionLabel}"
+                    Command="{Binding ToggleStateCommand}"
+                    IsVisible="{Binding CanChangeState}"
+                    MinimumHeightRequest="32" />
+            <Button Text="Merge pull request"
+                    Command="{Binding MergeCommand}"
+                    IsVisible="{Binding CanMerge}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Asks how to merge, then merges" />
         </HorizontalStackLayout>
 
         <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*,Auto">
@@ -82,12 +95,26 @@
                         SemanticProperties.Description="Comment"
                         SemanticProperties.Hint="Markdown. Control Enter posts." />
 
-                <Button Grid.Row="2"
-                        Text="Post comment"
-                        Command="{Binding PostCommentCommand}"
-                        HorizontalOptions="Start"
-                        MinimumHeightRequest="32"
-                        SemanticProperties.Hint="Control Enter in the comment does the same" />
+                <!--
+                  On an open pull request the same words can be a review.
+                  Approve may be wordless; Request changes must say what.
+                -->
+                <HorizontalStackLayout Grid.Row="2" Spacing="8">
+                    <Button Text="Post comment"
+                            Command="{Binding PostCommentCommand}"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Control Enter in the comment does the same" />
+                    <Button Text="Approve"
+                            Command="{Binding ApproveCommand}"
+                            IsVisible="{Binding IsOpenPullRequest}"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Submits an approving review, with the comment as its words if there is one" />
+                    <Button Text="Request changes"
+                            Command="{Binding RequestChangesCommand}"
+                            IsVisible="{Binding IsOpenPullRequest}"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Submits a review asking for changes, with the comment as its words" />
+                </HorizontalStackLayout>
             </Grid>
         </a11y:Pane>
 

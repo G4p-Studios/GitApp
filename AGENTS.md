@@ -109,7 +109,9 @@ that is not in the foreground: `docs/DEVELOPING.md`.
 - `docs/DIFF-VIEWER.md` — the diff viewer, and why it deviates from VS Code.
 - `docs/GITHUB.md` — sign-in, token storage, and the remote repository list.
 - `docs/REPOSITORY-VIEW.md` — the github.com-style repository screen.
-- `docs/ISSUES.md` — issues and pull requests, read only.
+- `docs/ISSUES.md` — issues and pull requests: reading, commenting,
+  close and reopen, merge, review.
+- `docs/RELEASES.md` — the releases list and creating a release.
 - `docs/DEVELOPING.md` — prerequisites, build, verification method, traps.
 - `docs/SPIKE-MAUI.md` — the measurements behind the framework choice.
 
@@ -130,9 +132,11 @@ browser sign-in is written but needs a registered OAuth client ID; the
 repository screen and file view are built (`docs/REPOSITORY-VIEW.md`);
 issues and pull requests are built (`docs/ISSUES.md`).
 
-Milestone 4, GitHub write, has started: commenting on issues and pull
-requests is built (`docs/ISSUES.md`, "Writing a comment"). Review, merge
-and releases are not.
+Milestone 4, GitHub write, is built and awaiting live verification:
+commenting, close and reopen, merge with a method choice, and
+approve/request-changes reviews on the conversation screen
+(`docs/ISSUES.md`); the releases list and creating a release, opened
+from the About pane (`docs/RELEASES.md`).
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

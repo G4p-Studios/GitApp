@@ -217,6 +217,16 @@ public sealed record GitHubRepoView(
     }
 
     /// <summary>
+    /// The releases fact, named on its own because it is the one About
+    /// fact that is also a door: on github.com the sidebar's Releases
+    /// section opens the releases list, and so does this one. The page
+    /// matches on this string rather than searching for "release".
+    /// </summary>
+    public string ReleasesFact => ReleaseCount == 0
+        ? "No releases"
+        : ReleaseCount == 1 ? "1 release" : $"{ReleaseCount} releases";
+
+    /// <summary>
     /// The About pane, as one string per fact so each can be a control
     /// of its own. Empty facts are omitted rather than spoken as zero,
     /// except stars/watchers/forks/releases, where zero is information.
@@ -248,9 +258,7 @@ public sealed record GitHubRepoView(
             facts.Add(Stars == 1 ? "1 star" : $"{Stars} stars");
             facts.Add(Watchers == 1 ? "1 watcher" : $"{Watchers} watchers");
             facts.Add(Forks == 1 ? "1 fork" : $"{Forks} forks");
-            facts.Add(ReleaseCount == 0
-                ? "No releases"
-                : ReleaseCount == 1 ? "1 release" : $"{ReleaseCount} releases");
+            facts.Add(ReleasesFact);
 
             facts.Add(OpenIssueCount == 1 ? "1 open issue" : $"{OpenIssueCount} open issues");
             facts.Add(OpenPullRequestCount == 1

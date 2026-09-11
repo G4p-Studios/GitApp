@@ -25,6 +25,43 @@ public partial class WorkDetailPage : ContentPage
 
         _vm.ConversationChanged += (_, _) => Dispatcher.Dispatch(Render);
         _vm.CommentPosted += (_, comment) => Dispatcher.Dispatch(() => AddComment(comment));
+        _vm.FactsChanged += (_, _) => Dispatcher.Dispatch(OnFactsChanged);
+        _vm.ChooseMergeMethodAsync = ChooseMergeMethodAsync;
+    }
+
+    /// <summary>
+    /// The method picker doubles as the confirmation: choosing one merges.
+    /// Only the methods the repository allows are offered, in github.com's
+    /// words, so there is no "Rebase and merge" that fails on press.
+    /// </summary>
+    private async Task<MergeMethod?> ChooseMergeMethodAsync(IReadOnlyList<MergeMethod> methods)
+    {
+        var labels = methods.Select(m => m.Label()).ToArray();
+        var choice = await DisplayActionSheetAsync(
+            $"Merge pull request {_vm.Detail?.Item.Number} into {_vm.Detail?.Item.BaseRef}",
+            "Cancel",
+            null,
+            labels);
+
+        var index = Array.IndexOf(labels, choice);
+        return index >= 0 ? methods[index] : null;
+    }
+
+    /// <summary>
+    /// After a close, reopen, merge or review the sidebar is redrawn. A
+    /// merge also hides the button that was just pressed and the
+    /// close/reopen button beside it, and WinUI's own choice of where
+    /// focus goes next is not reliable, so focus is put on the
+    /// conversation deliberately rather than left nowhere.
+    /// </summary>
+    private void OnFactsChanged()
+    {
+        RenderAbout();
+
+        if (_vm.Detail?.Item.State == GitHubItemState.Merged)
+        {
+            FocusManager.Current.TryFocusPane("work-conversation", announce: false);
+        }
     }
 
     protected override void OnAppearing()
@@ -126,7 +163,7 @@ public partial class WorkDetailPage : ContentPage
     {
         BodyHost.Children.Clear();
         CommentsHost.Children.Clear();
-        AboutFactsHost.Children.Clear();
+        RenderAbout();
 
         if (_vm.BodyBlocks.Count == 0)
         {
@@ -150,13 +187,18 @@ public partial class WorkDetailPage : ContentPage
             {
                 AddComment(comment);
             }
+        }
+    }
 
-            foreach (var fact in detail.AboutFacts)
-            {
-                var label = new Label { Text = fact, FontSize = 14 };
-                SemanticProperties.SetDescription(label, fact);
-                AboutFactsHost.Children.Add(label);
-            }
+    private void RenderAbout()
+    {
+        AboutFactsHost.Children.Clear();
+
+        foreach (var fact in _vm.AboutFacts)
+        {
+            var label = new Label { Text = fact, FontSize = 14 };
+            SemanticProperties.SetDescription(label, fact);
+            AboutFactsHost.Children.Add(label);
         }
     }
 
@@ -177,6 +219,12 @@ public partial class WorkDetailPage : ContentPage
         CommentsHost.Children.Add(heading);
 
         var blocks = ReadmeDocument.Parse(comment.BodyMarkdown);
+        if (blocks.Count == 0 && comment.IsReview)
+        {
+            // "reviewer approved, 2 hours ago" is the whole entry.
+            return;
+        }
+
         if (blocks.Count == 0)
         {
             var blank = new Label { Text = "Empty comment.", FontSize = 14, Opacity = 0.7 };

@@ -363,6 +363,241 @@ public class IssueTests
         Assert.Contains("check whether it was posted", result.Error);
     }
 
+    private const string PullDetail = """
+        {
+          "data": {
+            "repository": {
+              "mergeCommitAllowed": true,
+              "squashMergeAllowed": true,
+              "rebaseMergeAllowed": false,
+              "pullRequest": {
+                "id": "PR_kwDOAbc456",
+                "number": 12,
+                "title": "Port to MAUI",
+                "state": "OPEN",
+                "isDraft": false,
+                "body": "Ports the shell.",
+                "author": { "login": "alexoloopios" },
+                "createdAt": "2026-09-10T12:00:00Z",
+                "updatedAt": "2026-09-11T12:00:00Z",
+                "url": "https://github.com/G4p-Studios/GitApp/pull/12",
+                "headRefName": "maui",
+                "baseRefName": "main",
+                "merged": false,
+                "mergeable": "MERGEABLE",
+                "reviewDecision": "APPROVED",
+                "additions": 10,
+                "deletions": 2,
+                "changedFiles": 3,
+                "commits": { "totalCount": 4 },
+                "comments": {
+                  "totalCount": 1,
+                  "nodes": [
+                    { "author": { "login": "claude" }, "createdAt": "2026-09-11T09:00:00Z", "body": "Second." }
+                  ]
+                },
+                "reviews": {
+                  "nodes": [
+                    { "author": { "login": "reviewer" }, "createdAt": "2026-09-11T08:00:00Z", "body": "", "state": "APPROVED" },
+                    { "author": { "login": "reviewer" }, "createdAt": "2026-09-11T07:00:00Z", "body": "", "state": "COMMENTED" },
+                    { "author": { "login": "other" }, "createdAt": "2026-09-11T10:00:00Z", "body": "Please rename.", "state": "CHANGES_REQUESTED" }
+                  ]
+                },
+                "labels": { "nodes": [] },
+                "assignees": { "nodes": [] },
+                "milestone": null
+              }
+            }
+          }
+        }
+        """;
+
+    [Fact]
+    public void ReviewsJoinTheConversationInDateOrderWithTheirVerdictInTheHeading()
+    {
+        var detail = GitHubClient.ParsePullRequestDetail(PullDetail)!;
+
+        // The wordless COMMENTED review is a shell around line comments and is left out.
+        Assert.Equal(3, detail.Comments.Count);
+        Assert.StartsWith("reviewer approved,", detail.Comments[0].Heading);
+        Assert.StartsWith("claude,", detail.Comments[1].Heading);
+        Assert.StartsWith("other requested changes,", detail.Comments[2].Heading);
+        Assert.Equal("Please rename.", detail.Comments[2].BodyMarkdown);
+        Assert.True(detail.Comments[0].IsReview);
+        Assert.False(detail.Comments[1].IsReview);
+    }
+
+    [Fact]
+    public void ThePullRequestKnowsWhichMergeMethodsTheRepositoryAllows()
+    {
+        var detail = GitHubClient.ParsePullRequestDetail(PullDetail)!;
+
+        Assert.Equal(new[] { MergeMethod.Merge, MergeMethod.Squash }, detail.MergeMethods);
+        Assert.True(detail.CanMerge);
+        Assert.True(detail.IsOpenPullRequest);
+        Assert.Equal("Close pull request", detail.StateActionLabel);
+        Assert.Contains("Review approved", detail.AboutFacts);
+    }
+
+    [Fact]
+    public void ADraftOrConflictingOrClosedPullRequestOffersNoMerge()
+    {
+        var detail = GitHubClient.ParsePullRequestDetail(PullDetail)!;
+
+        Assert.False((detail with { Item = detail.Item with { IsDraft = true } }).CanMerge);
+        Assert.False((detail with { Mergeable = "CONFLICTING" }).CanMerge);
+        Assert.False(detail.WithState(GitHubItemState.Closed).CanMerge);
+        Assert.False((detail with { MergeMethods = Array.Empty<MergeMethod>() }).CanMerge);
+    }
+
+    [Fact]
+    public void ChangingStateChangesTheLabelAndMergedIsFinal()
+    {
+        var detail = GitHubClient.ParseIssueDetail(IssueDetail)!;
+
+        var closed = detail.WithState(GitHubItemState.Closed);
+        Assert.Equal("Reopen issue", closed.StateActionLabel);
+        Assert.Equal("closed", closed.Metadata.Split(", ")[0]);
+        Assert.True(closed.CanChangeState);
+
+        var pr = GitHubClient.ParsePullRequestDetail(PullDetail)!.WithState(GitHubItemState.Merged);
+        Assert.False(pr.CanChangeState);
+        Assert.Contains("merged", pr.AboutFacts);
+    }
+
+    [Fact]
+    public async Task ClosingAnIssueUsesTheIssueMutationAndReturnsTheNewState()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """{ "data": { "closeIssue": { "issue": { "state": "CLOSED", "merged": false } } } }""");
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.SetStateAsync(GitHubWorkKind.Issue, "I_1", open: false);
+
+        Assert.True(result.Success);
+        Assert.Equal(GitHubItemState.Closed, result.Value);
+        Assert.Contains("closeIssue(input: {issueId: $id})", sent);
+    }
+
+    [Fact]
+    public async Task ReopeningAPullRequestUsesThePullRequestMutation()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """{ "data": { "reopenPullRequest": { "pullRequest": { "state": "OPEN", "merged": false } } } }""");
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.SetStateAsync(GitHubWorkKind.PullRequest, "PR_1", open: true);
+
+        Assert.Equal(GitHubItemState.Open, result.Value);
+        Assert.Contains("reopenPullRequest(input: {pullRequestId: $id})", sent);
+    }
+
+    [Fact]
+    public async Task MergeSendsTheMethodAndOnlyMergedCountsAsSuccess()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """{ "data": { "mergePullRequest": { "pullRequest": { "state": "MERGED", "merged": true } } } }""");
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.MergePullRequestAsync("PR_1", MergeMethod.Squash);
+
+        Assert.True(result.Success);
+        Assert.Equal(GitHubItemState.Merged, result.Value);
+        Assert.Contains("\"method\":\"SQUASH\"", sent);
+
+        var unconfirmed = new ScriptedHandler(_ => Json(HttpStatusCode.OK,
+            """{ "data": { "mergePullRequest": { "pullRequest": { "state": "OPEN", "merged": false } } } }"""));
+        using var client2 = new GitHubClient("t", unconfirmed);
+        var second = await client2.MergePullRequestAsync("PR_1", MergeMethod.Merge);
+
+        Assert.False(second.Success);
+        Assert.Contains("did not confirm the merge", second.Error);
+    }
+
+    [Fact]
+    public async Task ABlockedMergeSpeaksGitHubsReason()
+    {
+        var handler = new ScriptedHandler(_ => Json(HttpStatusCode.OK, """
+            {
+              "data": { "mergePullRequest": null },
+              "errors": [ { "type": "UNPROCESSABLE", "message": "Pull Request is not mergeable: required status check \"build\" is failing" } ]
+            }
+            """));
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.MergePullRequestAsync("PR_1", MergeMethod.Merge);
+
+        Assert.False(result.Success);
+        Assert.Contains("required status check", result.Error);
+    }
+
+    [Fact]
+    public async Task AReviewComesBackAsAConversationEntryWithItsVerdict()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """
+                { "data": { "addPullRequestReview": { "pullRequestReview": {
+                  "author": { "login": "alexoloopios" },
+                  "createdAt": "2026-09-11T17:00:00Z",
+                  "body": "Rename the pane.",
+                  "state": "CHANGES_REQUESTED"
+                } } } }
+                """);
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.ReviewPullRequestAsync("PR_1", ReviewEvent.RequestChanges, "Rename the pane.");
+
+        Assert.True(result.Success);
+        Assert.Equal("requested changes", result.Value!.Verdict);
+        Assert.StartsWith("alexoloopios requested changes,", result.Value.Heading);
+        Assert.Contains("\"event\":\"REQUEST_CHANGES\"", sent);
+    }
+
+    [Fact]
+    public async Task AnApprovalWithNoWordsSendsNoBody()
+    {
+        string? sent = null;
+        var handler = new ScriptedHandler(request =>
+        {
+            sent = request.Content!.ReadAsStringAsync().Result;
+            return Json(HttpStatusCode.OK, """
+                { "data": { "addPullRequestReview": { "pullRequestReview": {
+                  "author": { "login": "alexoloopios" }, "createdAt": "2026-09-11T17:00:00Z", "body": "", "state": "APPROVED"
+                } } } }
+                """);
+        });
+
+        using var client = new GitHubClient("t", handler);
+        var result = await client.ReviewPullRequestAsync("PR_1", ReviewEvent.Approve, "   ");
+
+        Assert.Equal("approved", result.Value!.Verdict);
+        Assert.Contains("\"body\":null", sent);
+    }
+
+    [Fact]
+    public void MergeMethodLabelsAreGitHubsButtonWords()
+    {
+        Assert.Equal("Create a merge commit", MergeMethod.Merge.Label());
+        Assert.Equal("Squash and merge", MergeMethod.Squash.Label());
+        Assert.Equal("Rebase and merge", MergeMethod.Rebase.Label());
+    }
+
     private static HttpResponseMessage Json(HttpStatusCode status, string body) =>
         new(status) { Content = new StringContent(body, Encoding.UTF8, "application/json") };
 

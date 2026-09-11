@@ -1,0 +1,186 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             xmlns:local="clr-namespace:GitApp"
+             x:Class="GitApp.ReleasesPage"
+             x:DataType="vm:ReleasesViewModel"
+             Title="Releases">
+
+    <!--
+      Three panes, cycled with F6: Releases, Details, New release.
+
+      The list is one row per release; Details shows the selected one's
+      notes as a document and its assets; New release is the form. Same
+      top-to-bottom order as github.com's releases page, which lists then
+      offers "Draft a new release". See docs/RELEASES.md.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="360,*,320">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="3"
+                               Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back to repository"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to the repository. Escape does the same." />
+            <Button x:Name="RefreshButton"
+                    Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Fetches the releases from GitHub again" />
+            <Button x:Name="OpenGitHubButton"
+                    Text="View on github.com"
+                    Command="{Binding OpenOnGitHubCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens the selected release in your browser, where assets can be downloaded" />
+        </HorizontalStackLayout>
+
+        <!-- Releases -->
+        <a11y:Pane x:Name="ListPane"
+                   Grid.Row="1" Grid.Column="0"
+                   PaneId="releases-list" PaneName="Releases" PaneOrder="10">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+                <Label Grid.Row="0"
+                       Text="Releases"
+                       FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Grid.Row="1"
+                       Text="{Binding ListSummary}"
+                       FontSize="14"
+                       Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="2"
+                                x:Name="ReleaseList"
+                                ItemsSource="{Binding Items}"
+                                SelectedItem="{Binding SelectedRelease, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Releases">
+                    <CollectionView.EmptyView>
+                        <Label Text="No releases yet"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:GitHubRelease">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Title}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <!-- Details: the selected release -->
+        <a11y:Pane x:Name="DetailsPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="releases-details" PaneName="Details" PaneOrder="20">
+            <Grid RowDefinitions="Auto,Auto,*,Auto,Auto" Padding="12" RowSpacing="6">
+                <Label Grid.Row="0"
+                       x:Name="DetailsTitleLabel"
+                       Text="{Binding DetailsTitle}"
+                       FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Grid.Row="1"
+                       Text="{Binding DetailsMetadata}"
+                       IsVisible="{Binding HasSelection}"
+                       FontSize="14"
+                       Opacity="0.8"
+                       SemanticProperties.Description="{Binding DetailsMetadata}" />
+
+                <local:MarkdownDocumentView Grid.Row="2"
+                                            x:Name="NotesDocument"
+                                            FillPane="True"
+                                            IsVisible="{Binding HasNotes}" />
+                <Label Grid.Row="2"
+                       Text="No release notes."
+                       IsVisible="{Binding NoNotes}"
+                       FontSize="14"
+                       Opacity="0.7"
+                       VerticalOptions="Start"
+                       SemanticProperties.Description="No release notes." />
+
+                <Label Grid.Row="3"
+                       Text="{Binding AssetsHeading}"
+                       IsVisible="{Binding HasSelection}"
+                       FontSize="16"
+                       Margin="0,8,0,0"
+                       SemanticProperties.HeadingLevel="Level2" />
+                <VerticalStackLayout Grid.Row="4"
+                                     x:Name="AssetsHost"
+                                     Spacing="4" />
+            </Grid>
+        </a11y:Pane>
+
+        <!-- New release: the form -->
+        <a11y:Pane x:Name="FormPane"
+                   Grid.Row="1" Grid.Column="2"
+                   PaneId="releases-new" PaneName="New release" PaneOrder="30">
+            <ScrollView Padding="12">
+                <VerticalStackLayout Spacing="8">
+                    <Label x:Name="FormHeading"
+                           Text="New release"
+                           FontSize="16"
+                           SemanticProperties.HeadingLevel="Level1" />
+
+                    <Entry x:Name="TagEntry"
+                           Text="{Binding Tag, Mode=TwoWay}"
+                           Placeholder="v1.0.0"
+                           SemanticProperties.Description="Tag"
+                           SemanticProperties.Hint="Required. Created on the target branch if it does not exist yet" />
+
+                    <Picker x:Name="TargetPicker"
+                            ItemsSource="{Binding Branches}"
+                            SelectedItem="{Binding Target, Mode=TwoWay}"
+                            Title="Target branch"
+                            SemanticProperties.Description="Target branch"
+                            SemanticProperties.Hint="The branch a new tag is created from" />
+
+                    <Entry Text="{Binding NewTitle, Mode=TwoWay}"
+                           Placeholder="Release title"
+                           SemanticProperties.Description="Release title"
+                           SemanticProperties.Hint="Optional. The tag is used when blank" />
+
+                    <Editor x:Name="NotesEditor"
+                            Text="{Binding Notes, Mode=TwoWay}"
+                            HeightRequest="160"
+                            AutoSize="Disabled"
+                            Placeholder="Release notes, in Markdown"
+                            SemanticProperties.Description="Release notes"
+                            SemanticProperties.Hint="Markdown. Control Enter publishes." />
+
+                    <HorizontalStackLayout Spacing="4">
+                        <CheckBox IsChecked="{Binding IsPrerelease, Mode=TwoWay}"
+                                  SemanticProperties.Description="Pre-release"
+                                  SemanticProperties.Hint="Marks the release as not production ready" />
+                        <Label Text="Pre-release" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <HorizontalStackLayout Spacing="4">
+                        <CheckBox IsChecked="{Binding IsDraft, Mode=TwoWay}"
+                                  SemanticProperties.Description="Save as draft"
+                                  SemanticProperties.Hint="Creates the release without publishing it" />
+                        <Label Text="Save as draft" VerticalOptions="Center" />
+                    </HorizontalStackLayout>
+
+                    <Button Text="{Binding PublishLabel}"
+                            Command="{Binding PublishCommand}"
+                            HorizontalOptions="Start"
+                            MinimumHeightRequest="32"
+                            SemanticProperties.Hint="Control Enter in the notes does the same" />
+                </VerticalStackLayout>
+            </ScrollView>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="3"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

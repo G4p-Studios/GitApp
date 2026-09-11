@@ -81,6 +81,8 @@ public class RepositoryViewTests
         Assert.Contains("G4p-Studios/GitApp, public", view.AboutFacts);
         Assert.Contains("Topics, accessibility, git", view.AboutFacts);
         Assert.Contains("No releases", view.AboutFacts);
+        Assert.Equal("No releases", view.ReleasesFact);
+        Assert.Contains(view.ReleasesFact, view.AboutFacts);
         Assert.Contains("4 open issues", view.AboutFacts);
         Assert.Contains("1 open pull request", view.AboutFacts);
     }

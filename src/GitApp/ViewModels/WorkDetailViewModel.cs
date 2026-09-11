@@ -36,16 +36,38 @@ public sealed class WorkDetailViewModel : ObservableObject
         _metadata = item.AccessibleName;
         OpenOnGitHubCommand = new AsyncCommand(OpenOnGitHubAsync);
         PostCommentCommand = new AsyncCommand(PostCommentAsync, () => CanPost);
+        ToggleStateCommand = new AsyncCommand(ToggleStateAsync, () => !_isBusy && CanChangeState);
+        MergeCommand = new AsyncCommand(MergeAsync, () => !_isBusy && CanMerge);
+        ApproveCommand = new AsyncCommand(() => ReviewAsync(ReviewEvent.Approve), () => !_isBusy && IsOpenPullRequest);
+        RequestChangesCommand = new AsyncCommand(() => ReviewAsync(ReviewEvent.RequestChanges), () => !_isBusy && IsOpenPullRequest);
     }
 
     public System.Windows.Input.ICommand OpenOnGitHubCommand { get; }
 
     public AsyncCommand PostCommentCommand { get; }
 
+    public AsyncCommand ToggleStateCommand { get; }
+
+    public AsyncCommand MergeCommand { get; }
+
+    public AsyncCommand ApproveCommand { get; }
+
+    public AsyncCommand RequestChangesCommand { get; }
+
+    /// <summary>
+    /// Supplied by the page: show the allowed methods and return the one
+    /// chosen, or null for cancel. The choice is the confirmation; a merge
+    /// is not undone with one keystroke the way a close is.
+    /// </summary>
+    public Func<IReadOnlyList<MergeMethod>, Task<MergeMethod?>>? ChooseMergeMethodAsync { get; set; }
+
     public event EventHandler? ConversationChanged;
 
-    /// <summary>Raised after a comment is posted, with the comment appended.</summary>
+    /// <summary>Raised after a comment or review is posted, with the entry to append.</summary>
     public event EventHandler<GitHubComment>? CommentPosted;
+
+    /// <summary>State changed or merged: the sidebar facts and the toolbar buttons are stale.</summary>
+    public event EventHandler? FactsChanged;
 
     /// <summary>The comment being written. Never cleared on failure.</summary>
     public string Draft
@@ -64,6 +86,14 @@ public sealed class WorkDetailViewModel : ObservableObject
     public bool HasDraft => !string.IsNullOrWhiteSpace(_draft);
 
     public bool CanPost => HasDraft && !_isBusy && _detail is { CanComment: true };
+
+    public bool CanChangeState => _detail is { CanChangeState: true };
+
+    public bool CanMerge => _detail is { CanMerge: true };
+
+    public bool IsOpenPullRequest => _detail is { IsOpenPullRequest: true, CanComment: true };
+
+    public string StateActionLabel => _detail?.StateActionLabel ?? $"Close {_listedItem.KindWord}";
 
     public GitHubWorkKind Kind => _listedItem.Kind;
 
@@ -94,9 +124,30 @@ public sealed class WorkDetailViewModel : ObservableObject
         {
             if (Set(ref _isBusy, value))
             {
-                PostCommentCommand.RaiseCanExecuteChanged();
+                RaiseCommands();
             }
         }
+    }
+
+    private void RaiseCommands()
+    {
+        PostCommentCommand.RaiseCanExecuteChanged();
+        ToggleStateCommand.RaiseCanExecuteChanged();
+        MergeCommand.RaiseCanExecuteChanged();
+        ApproveCommand.RaiseCanExecuteChanged();
+        RequestChangesCommand.RaiseCanExecuteChanged();
+    }
+
+    /// <summary>Everything derived from the detail record, after it changes.</summary>
+    private void RaiseDetail()
+    {
+        Raise(nameof(Detail));
+        Raise(nameof(AboutFacts));
+        Raise(nameof(CanChangeState));
+        Raise(nameof(CanMerge));
+        Raise(nameof(IsOpenPullRequest));
+        Raise(nameof(StateActionLabel));
+        RaiseCommands();
     }
 
     public GitHubWorkDetail? Detail => _detail;
@@ -140,9 +191,8 @@ public sealed class WorkDetailViewModel : ObservableObject
                 ? Array.Empty<ReadmeBlock>()
                 : ReadmeDocument.Parse(_detail.BodyMarkdown);
 
-            Raise(nameof(Detail));
             Raise(nameof(BodyBlocks));
-            Raise(nameof(AboutFacts));
+            RaiseDetail();
             ConversationChanged?.Invoke(this, EventArgs.Empty);
             done($"{_listedItem.KindWord} {_listedItem.Number}, {_detail.CommentsHeading}");
         }
@@ -196,8 +246,7 @@ public sealed class WorkDetailViewModel : ObservableObject
             CommentsHeading = _detail.CommentsHeading;
             Draft = string.Empty;
 
-            Raise(nameof(Detail));
-            Raise(nameof(AboutFacts));
+            RaiseDetail();
             CommentPosted?.Invoke(this, result.Value!);
             done($"Comment posted. {_detail.CommentsHeading}.");
         }
@@ -207,6 +256,169 @@ public sealed class WorkDetailViewModel : ObservableObject
             IsBusy = false;
         }
     }
+
+    /// <summary>
+    /// Close or reopen. No confirmation: github.com has none, and the
+    /// opposite action is one press of the same button.
+    /// </summary>
+    public async Task ToggleStateAsync()
+    {
+        if (_detail is not { CanChangeState: true } detail)
+        {
+            return;
+        }
+
+        if (_session.CreateClient() is not { } client)
+        {
+            _announcer.Announce("Sign in to GitHub first.", Urgency.Assertive);
+            return;
+        }
+
+        var opening = detail.Item.State != GitHubItemState.Open;
+        var what = $"{_listedItem.KindWord} {_listedItem.Number}";
+
+        IsBusy = true;
+        var done = _announcer.Operation(opening ? $"Reopening {what}" : $"Closing {what}");
+
+        try
+        {
+            var result = await client.SetStateAsync(_listedItem.Kind, detail.NodeId!, opening);
+
+            if (!result.Success)
+            {
+                done(result.Error!);
+                return;
+            }
+
+            ApplyState(result.Value);
+            done(result.Value == GitHubItemState.Open
+                ? $"{Capitalise(what)} reopened."
+                : $"{Capitalise(what)} closed.");
+        }
+        finally
+        {
+            client.Dispose();
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>Merge, after the page has had the user pick a method.</summary>
+    public async Task MergeAsync()
+    {
+        if (_detail is not { CanMerge: true } detail || ChooseMergeMethodAsync is null)
+        {
+            return;
+        }
+
+        if (await ChooseMergeMethodAsync(detail.MergeMethods!) is not { } method)
+        {
+            _announcer.Announce("Merge cancelled.");
+            return;
+        }
+
+        if (_session.CreateClient() is not { } client)
+        {
+            _announcer.Announce("Sign in to GitHub first.", Urgency.Assertive);
+            return;
+        }
+
+        var what = $"pull request {_listedItem.Number}";
+
+        IsBusy = true;
+        var done = _announcer.Operation($"Merging {what} into {detail.Item.BaseRef}");
+
+        try
+        {
+            var result = await client.MergePullRequestAsync(detail.NodeId!, method);
+
+            if (!result.Success)
+            {
+                done(result.Error!);
+                return;
+            }
+
+            ApplyState(GitHubItemState.Merged);
+            done($"{Capitalise(what)} merged into {detail.Item.BaseRef}.");
+        }
+        finally
+        {
+            client.Dispose();
+            IsBusy = false;
+        }
+    }
+
+    /// <summary>
+    /// Approve or request changes, with the draft as the review's words.
+    /// Requesting changes with nothing said is refused before it reaches
+    /// GitHub, which would refuse it too, less clearly.
+    /// </summary>
+    public async Task ReviewAsync(ReviewEvent verdict)
+    {
+        if (_detail is not { IsOpenPullRequest: true, CanComment: true } detail)
+        {
+            return;
+        }
+
+        if (verdict == ReviewEvent.RequestChanges && !HasDraft)
+        {
+            _announcer.Announce("Write what needs to change first, in the comment box.");
+            return;
+        }
+
+        if (_session.CreateClient() is not { } client)
+        {
+            _announcer.Announce("Sign in to GitHub first.", Urgency.Assertive);
+            return;
+        }
+
+        var what = $"pull request {_listedItem.Number}";
+
+        IsBusy = true;
+        var done = _announcer.Operation(verdict == ReviewEvent.Approve
+            ? $"Approving {what}"
+            : $"Requesting changes on {what}");
+
+        try
+        {
+            var result = await client.ReviewPullRequestAsync(detail.NodeId!, verdict, _draft.Trim());
+
+            if (!result.Success)
+            {
+                done(result.Error!);
+                return;
+            }
+
+            _detail = detail.WithComment(result.Value!) with
+            {
+                ReviewDecision = verdict == ReviewEvent.Approve ? "APPROVED" : "CHANGES_REQUESTED",
+            };
+            CommentsHeading = _detail.CommentsHeading;
+            Draft = string.Empty;
+
+            RaiseDetail();
+            CommentPosted?.Invoke(this, result.Value!);
+            FactsChanged?.Invoke(this, EventArgs.Empty);
+            done(verdict == ReviewEvent.Approve
+                ? $"Approved {what}."
+                : $"Requested changes on {what}.");
+        }
+        finally
+        {
+            client.Dispose();
+            IsBusy = false;
+        }
+    }
+
+    private void ApplyState(GitHubItemState state)
+    {
+        _detail = _detail!.WithState(state);
+        Metadata = _detail.Metadata;
+        RaiseDetail();
+        FactsChanged?.Invoke(this, EventArgs.Empty);
+    }
+
+    private static string Capitalise(string text) =>
+        char.ToUpperInvariant(text[0]) + text[1..];
 
     private async Task OpenOnGitHubAsync()
     {

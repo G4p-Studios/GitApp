@@ -13,6 +13,7 @@ public partial class RepositoryPage : ContentPage
     private readonly RepositoryViewModel _vm;
     private WorkListPage? _issuesPage;
     private WorkListPage? _pullsPage;
+    private ReleasesPage? _releasesPage;
     private bool _initialised;
 
     public RepositoryPage(GitHubSession session, GitHubRepository listed)
@@ -177,16 +178,43 @@ public partial class RepositoryPage : ContentPage
         ReadmePane.EntryControl = ReadmeDocument;
     }
 
+    /// <summary>
+    /// One control per fact. The releases fact is a button, because on
+    /// github.com the sidebar's Releases section is where you go to the
+    /// releases, and a toolbar button would put the action away from the
+    /// count it belongs to. See docs/RELEASES.md.
+    /// </summary>
     private void RenderAbout()
     {
         AboutFactsHost.Children.Clear();
 
         foreach (var fact in _vm.AboutFacts)
         {
+            if (fact == _vm.ReleasesFact)
+            {
+                var button = new Button
+                {
+                    Text = fact,
+                    FontSize = 14,
+                    MinimumHeightRequest = 32,
+                    HorizontalOptions = LayoutOptions.Start,
+                };
+                SemanticProperties.SetHint(button, "Opens the releases list");
+                button.Clicked += OnOpenReleases;
+                AboutFactsHost.Children.Add(button);
+                continue;
+            }
+
             var label = new Label { Text = fact, FontSize = 14 };
             SemanticProperties.SetDescription(label, fact);
             AboutFactsHost.Children.Add(label);
         }
+    }
+
+    private void OnOpenReleases(object? sender, EventArgs e)
+    {
+        _releasesPage ??= new ReleasesPage(_session, _listed);
+        AppNavigator.Show(_releasesPage);
     }
 
     private void OnOpenIssues(object? sender, EventArgs e) =>

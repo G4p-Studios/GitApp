@@ -493,7 +493,10 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    repository screen and file view (`docs/REPOSITORY-VIEW.md`), and
    issues and pull requests (`docs/ISSUES.md`) are built.
 4. **GitHub write.** Comment, review, merge, release management.
-   Commenting on issues and pull requests is built (`docs/ISSUES.md`).
+   Commenting, close and reopen, merge, and whole-pull-request review
+   are built (`docs/ISSUES.md`); the releases list and creating a
+   release are built (`docs/RELEASES.md`). None of it has yet been
+   exercised against a real repository.
 5. **Notifications.** Polling, toasts, inbox.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.
 

@@ -1,8 +1,10 @@
 # Issues and pull requests
 
 Status: reading built and verified with a real account, 2026-09-11
-(milestone 3). Commenting is built and not yet verified live (milestone
-4, first slice). Reviewing and merging are not built.
+(milestone 3). Commenting, closing and reopening, merging, and whole-
+pull-request review are built (milestone 4). The comment pane has been
+seen to read correctly live; the write actions have not yet been
+exercised against a real repository.
 
 From the repository screen, Issues and Pull requests are their own lists,
 the way they are tabs on github.com. Putting them in the Files/Readme/About
@@ -62,14 +64,22 @@ same Markdown document as the README (`docs/REPOSITORY-VIEW.md`): arrow
 keys move a caret, links stay in the sentence as hyperlinks. Body headings
 are shifted down one level so they cannot outrank the title.
 
+Reviews are part of the conversation, in date order with the comments,
+the way github.com's timeline shows "X approved these changes". The
+verdict is in the heading: `reviewer approved, 2 hours ago`, `other
+requested changes, 1 hour ago`. A review with no words and no verdict is
+the shell GitHub wraps around line comments, which are not fetched, and
+is left out rather than shown as "Empty comment".
+
 About is the github.com sidebar, one fact per control: state, labels,
 assignees, milestone, and for a pull request the branches, commit count,
-diffstat, and whether it can merge. "No one assigned" and "No milestone"
-are said, because an empty sidebar is indistinguishable from a missing one.
+diffstat, the review decision, and whether it can merge. "No one
+assigned" and "No milestone" are said, because an empty sidebar is
+indistinguishable from a missing one.
 
-Review threads, files changed as a list, and the timeline of label-and-
-assignment events are not in this slice. The conversation and the merge
-facts are what you open a pull request to read.
+Review threads on lines, files changed as a list, and the timeline of
+label-and-assignment events are not in this slice. The conversation and
+the merge facts are what you open a pull request to read.
 
 ## Writing a comment
 
@@ -105,6 +115,49 @@ the conversation. A fine-grained token needs the Issues and Pull
 requests permissions set to read and write; without them GitHub replies
 "Resource not accessible by personal access token", which is spoken as
 is.
+
+## Closing and reopening
+
+One toolbar button whose name says which way it goes: "Close issue",
+"Reopen pull request". No confirmation, matching github.com, because the
+opposite action is one press of the same button. `Closing issue 17` then
+`Issue 17 closed.`; the button's name flips, the metadata line and the
+About state update. Merged pull requests hide the button: merged is
+final.
+
+## Merging
+
+"Merge pull request" appears in the toolbar only when GitHub says the
+branches combine (`mergeable: MERGEABLE`), the pull request is open and
+not a draft, and the repository allows at least one merge method. Branch
+protection is not checked up front; GitHub refuses the merge and its
+reason, for instance a failing required check, is spoken as is.
+
+Pressing it opens a choice of the allowed methods in github.com's own
+words: Create a merge commit, Squash and merge, Rebase and merge. Only
+the methods the repository permits are offered, so nothing is presented
+that would fail on press. Choosing one is the confirmation; there is no
+second "are you sure". Cancel announces `Merge cancelled.` so Escape out
+of the dialog is not silence.
+
+`Merging pull request 12 into main` then `Pull request 12 merged into
+main.` The Merge and Close buttons both hide, so focus is placed on the
+conversation deliberately rather than left wherever WinUI drops it.
+
+## Reviewing
+
+On an open pull request the comment pane has two more buttons beside
+Post comment: Approve and Request changes. Both submit a review on the
+whole pull request with the draft as its words. Approve may be wordless.
+Request changes with an empty draft is refused here, `Write what needs to
+change first, in the comment box.`, rather than sent to GitHub, which
+would refuse it less clearly. GitHub's other refusals, such as approving
+your own pull request, are spoken as is.
+
+The review is appended to the conversation with its verdict in the
+heading, the draft clears, the review decision in About updates, and
+focus stays in the editor. Line-by-line review needs the pull request's
+diff on screen and is not built.
 
 ## GraphQL
 

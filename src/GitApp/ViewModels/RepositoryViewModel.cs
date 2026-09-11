@@ -66,6 +66,9 @@ public sealed class RepositoryViewModel : ObservableObject
 
     public ObservableCollection<string> AboutFacts { get; } = new();
 
+    /// <summary>The one About fact that opens a screen. See GitHubRepoView.ReleasesFact.</summary>
+    public string? ReleasesFact { get; private set; }
+
     public ICommand CloneCommand { get; }
 
     public ICommand OpenOnGitHubCommand { get; }
@@ -334,6 +337,7 @@ public sealed class RepositoryViewModel : ObservableObject
 
         SelectedEntry = Entries.FirstOrDefault();
 
+        ReleasesFact = view.ReleasesFact;
         AboutFacts.Clear();
         foreach (var fact in view.AboutFacts)
         {

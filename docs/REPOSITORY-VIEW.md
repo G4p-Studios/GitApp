@@ -35,7 +35,9 @@ Taken from the real page, top to bottom, then mapped onto panes.
    are not at the root.
 7. **The README**, rendered, in its own pane.
 8. **About**: description, topics, language, stars, watchers, forks,
-   releases, open issues and pull requests, branch and tag counts.
+   releases, open issues and pull requests, branch and tag counts. The
+   releases fact is a button that opens the releases screen, as the
+   sidebar's Releases section does on github.com (`docs/RELEASES.md`).
 
 Issues and pull requests are not panes on this screen. They are their own
 lists, reached from the toolbar, documented in `docs/ISSUES.md`. A pane
@@ -84,7 +86,8 @@ reader user then describe the same screen to each other.
   repository list.
 - **Readme** — the README as one native document. Arrow keys move a
   caret line by line; links stay in the sentence they belong to.
-- **About** — one control per fact.
+- **About** — one control per fact. The releases count is a button and
+  opens the releases screen; everything else is text.
 
 The latest-commit line is the last thing in the Files pane, between the
 table and the README: subject on one line, author, age and hash on the

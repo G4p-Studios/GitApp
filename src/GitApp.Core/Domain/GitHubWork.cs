@@ -14,6 +14,71 @@ public enum GitHubItemState
 }
 
 /// <summary>
+/// How a pull request is merged. The words are github.com's own button
+/// labels, so someone who knows the site knows these.
+/// </summary>
+public enum MergeMethod
+{
+    Merge,
+    Squash,
+    Rebase,
+}
+
+public static class MergeMethodWords
+{
+    public static string Label(this MergeMethod method) => method switch
+    {
+        MergeMethod.Squash => "Squash and merge",
+        MergeMethod.Rebase => "Rebase and merge",
+        _ => "Create a merge commit",
+    };
+
+    /// <summary>The GraphQL enum value.</summary>
+    public static string ApiName(this MergeMethod method) => method switch
+    {
+        MergeMethod.Squash => "SQUASH",
+        MergeMethod.Rebase => "REBASE",
+        _ => "MERGE",
+    };
+}
+
+/// <summary>The verdict a review carries.</summary>
+public enum ReviewEvent
+{
+    Approve,
+    RequestChanges,
+    Comment,
+}
+
+public static class ReviewEventWords
+{
+    public static string ApiName(this ReviewEvent e) => e switch
+    {
+        ReviewEvent.Approve => "APPROVE",
+        ReviewEvent.RequestChanges => "REQUEST_CHANGES",
+        _ => "COMMENT",
+    };
+
+    /// <summary>Past tense, for the heading of the review in the conversation.</summary>
+    public static string Verdict(this ReviewEvent e) => e switch
+    {
+        ReviewEvent.Approve => "approved",
+        ReviewEvent.RequestChanges => "requested changes",
+        _ => "reviewed",
+    };
+
+    /// <summary>GitHub's review state to our verdict word. Null for states that are not verdicts.</summary>
+    public static string? VerdictFromState(string? state) => state switch
+    {
+        "APPROVED" => "approved",
+        "CHANGES_REQUESTED" => "requested changes",
+        "COMMENTED" => "reviewed",
+        "DISMISSED" => "reviewed, dismissed",
+        _ => null,
+    };
+}
+
+/// <summary>
 /// One row on the issues or pull requests list.
 /// </summary>
 public sealed record GitHubWorkItem(
@@ -133,15 +198,22 @@ public sealed record GitHubWorkItem(
 public sealed record GitHubComment(
     string? Author,
     DateTimeOffset CreatedAt,
-    string BodyMarkdown)
+    string BodyMarkdown,
+    string? Verdict = null)
 {
     public string AuthorWord => string.IsNullOrWhiteSpace(Author) ? "ghost" : Author!;
 
+    /// <summary>A review rather than a plain comment.</summary>
+    public bool IsReview => !string.IsNullOrEmpty(Verdict);
+
     /// <summary>
     /// Author and time as the heading of this comment, so a screen reader
-    /// jumping by heading lands at the start of each one.
+    /// jumping by heading lands at the start of each one. A review says
+    /// its verdict in the heading: "alexoloopios approved, 2 hours ago".
     /// </summary>
-    public string Heading => $"{AuthorWord}, {RelativeTime.From(CreatedAt)}";
+    public string Heading => IsReview
+        ? $"{AuthorWord} {Verdict}, {RelativeTime.From(CreatedAt)}"
+        : $"{AuthorWord}, {RelativeTime.From(CreatedAt)}";
 }
 
 /// <summary>
@@ -161,12 +233,42 @@ public sealed record GitHubWorkDetail(
     int Additions = 0,
     int Deletions = 0,
     string? Mergeable = null,
-    string? NodeId = null)
+    string? NodeId = null,
+    IReadOnlyList<MergeMethod>? MergeMethods = null,
+    string? ReviewDecision = null)
 {
     public string Title => Item.Title;
 
     /// <summary>Whether a comment can be posted: GitHub needs the node id.</summary>
     public bool CanComment => !string.IsNullOrEmpty(NodeId);
+
+    public bool IsOpenPullRequest =>
+        Item.Kind == GitHubWorkKind.PullRequest && Item.State == GitHubItemState.Open;
+
+    /// <summary>Merged is final; everything else can be closed or reopened.</summary>
+    public bool CanChangeState => CanComment && Item.State != GitHubItemState.Merged;
+
+    /// <summary>
+    /// The merge button is offered when GitHub says the branches combine
+    /// and the repository allows at least one method. Branch protection
+    /// is not checked here: GitHub refuses the merge and says why, and
+    /// that reason is spoken as is.
+    /// </summary>
+    public bool CanMerge =>
+        CanComment
+        && IsOpenPullRequest
+        && !Item.IsDraft
+        && string.Equals(Mergeable, "MERGEABLE", StringComparison.OrdinalIgnoreCase)
+        && MergeMethods is { Count: > 0 };
+
+    /// <summary>"Close issue", "Reopen pull request".</summary>
+    public string StateActionLabel =>
+        (Item.State == GitHubItemState.Open ? "Close " : "Reopen ") + Item.KindWord;
+
+    public GitHubWorkDetail WithState(GitHubItemState state) => this with
+    {
+        Item = Item with { State = state },
+    };
 
     /// <summary>
     /// The conversation with one more comment at the end, after posting.
@@ -256,6 +358,19 @@ public sealed record GitHubWorkDetail(
                     ? "1 file changed"
                     : $"{ChangedFiles} files changed");
                 facts.Add($"{Additions} added, {Deletions} removed");
+
+                switch (ReviewDecision)
+                {
+                    case "APPROVED":
+                        facts.Add("Review approved");
+                        break;
+                    case "CHANGES_REQUESTED":
+                        facts.Add("Changes requested");
+                        break;
+                    case "REVIEW_REQUIRED":
+                        facts.Add("Review required");
+                        break;
+                }
 
                 if (Item.State == GitHubItemState.Merged)
                 {

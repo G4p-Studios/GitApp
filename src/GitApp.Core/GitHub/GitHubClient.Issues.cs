@@ -93,6 +93,9 @@ public sealed partial class GitHubClient
     private const string PullDetailQuery = """
         query PullDetail($owner: String!, $name: String!, $number: Int!) {
           repository(owner: $owner, name: $name) {
+            mergeCommitAllowed
+            squashMergeAllowed
+            rebaseMergeAllowed
             pullRequest(number: $number) {
               id
               number
@@ -108,6 +111,7 @@ public sealed partial class GitHubClient
               baseRefName
               merged
               mergeable
+              reviewDecision
               additions
               deletions
               changedFiles
@@ -118,6 +122,14 @@ public sealed partial class GitHubClient
                   author { login }
                   createdAt
                   body
+                }
+              }
+              reviews(first: 50) {
+                nodes {
+                  author { login }
+                  createdAt
+                  body
+                  state
                 }
               }
               labels(first: 20) { nodes { name } }
@@ -364,6 +376,45 @@ public sealed partial class GitHubClient
             }
         }
 
+        // Reviews belong in the conversation, dated, the way github.com
+        // shows "X approved these changes" in the timeline. A review with
+        // no words and no verdict is the shell around line comments we do
+        // not fetch, and is left out rather than shown as "Empty comment".
+        if (node.TryGetProperty("reviews", out var reviewWrap)
+            && reviewWrap.TryGetProperty("nodes", out var reviewNodes)
+            && reviewNodes.ValueKind == JsonValueKind.Array)
+        {
+            foreach (var review in reviewNodes.EnumerateArray())
+            {
+                var verdict = ReviewEventWords.VerdictFromState(String(review, "state"));
+                var body = String(review, "body") ?? string.Empty;
+                if (verdict is null || (verdict == "reviewed" && string.IsNullOrWhiteSpace(body)))
+                {
+                    continue;
+                }
+
+                comments.Add(ReadComment(review) with { Verdict = verdict });
+            }
+
+            comments.Sort((a, b) => a.CreatedAt.CompareTo(b.CreatedAt));
+        }
+
+        var methods = new List<MergeMethod>();
+        if (Bool(repo, "mergeCommitAllowed"))
+        {
+            methods.Add(MergeMethod.Merge);
+        }
+
+        if (Bool(repo, "squashMergeAllowed"))
+        {
+            methods.Add(MergeMethod.Squash);
+        }
+
+        if (Bool(repo, "rebaseMergeAllowed"))
+        {
+            methods.Add(MergeMethod.Rebase);
+        }
+
         var assignees = Names(node, "assignees", "login");
         string? milestone = null;
         if (node.TryGetProperty("milestone", out var mile) && mile.ValueKind == JsonValueKind.Object)
@@ -390,7 +441,9 @@ public sealed partial class GitHubClient
             Additions: Int(node, "additions"),
             Deletions: Int(node, "deletions"),
             Mergeable: String(node, "mergeable"),
-            NodeId: String(node, "id"));
+            NodeId: String(node, "id"),
+            MergeMethods: methods,
+            ReviewDecision: String(node, "reviewDecision"));
     }
 
     internal static GitHubComment ReadComment(JsonElement comment) => new(
