@@ -154,6 +154,33 @@ public class NotificationTests
         Assert.Equal("reminder due", NotificationReason.Word("reminder_due"));
     }
 
+    [Theory]
+    [InlineData("https://api.github.com/repos/G4p-Studios/GitApp/issues/42",
+                "https://github.com/G4p-Studios/GitApp/issues/42")]
+    [InlineData("https://api.github.com/repos/G4p-Studios/GitApp/pulls/7",
+                "https://github.com/G4p-Studios/GitApp/pull/7")]
+    [InlineData("https://api.github.com/repos/G4p-Studios/GitApp/commits/abc123",
+                "https://github.com/G4p-Studios/GitApp/commit/abc123")]
+    public void ApiUrlsBecomeWebUrls(string api, string expected)
+    {
+        Assert.Equal(expected, NotificationLinks.Web(api, "G4p-Studios/GitApp"));
+    }
+
+    [Fact]
+    public void AnUnmappableSubjectFallsBackToTheRepositoryPage()
+    {
+        // A release's API url is keyed on an id, not the tag its web page uses,
+        // so opening the repository is the honest answer.
+        Assert.Equal(
+            "https://github.com/G4p-Studios/GitApp",
+            NotificationLinks.Web(
+                "https://api.github.com/repos/G4p-Studios/GitApp/releases/99", "G4p-Studios/GitApp"));
+
+        Assert.Equal(
+            "https://github.com/G4p-Studios/GitApp",
+            NotificationLinks.Web(null, "G4p-Studios/GitApp"));
+    }
+
     [Fact]
     public void TheInboxHeadingCountsUnreadInWords()
     {

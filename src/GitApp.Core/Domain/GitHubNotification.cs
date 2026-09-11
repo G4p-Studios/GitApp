@@ -49,6 +49,52 @@ public static class NotificationReason
 }
 
 /// <summary>
+/// Turning a notification's subject API url into a github.com page.
+///
+/// The notifications endpoint hands out API urls
+/// (<c>https://api.github.com/repos/owner/name/issues/42</c>), never the web
+/// url the user actually wants to open. The mapping is mechanical for issues,
+/// pull requests and commits; for anything else — a release keyed on a tag we
+/// were not given, a discussion — the repository page is the honest fallback.
+/// </summary>
+public static class NotificationLinks
+{
+    public static string? Web(string? apiUrl, string repoFullName)
+    {
+        var repoPage = string.IsNullOrWhiteSpace(repoFullName)
+            ? null
+            : $"https://github.com/{repoFullName}";
+
+        const string prefix = "https://api.github.com/repos/";
+        if (string.IsNullOrWhiteSpace(apiUrl)
+            || !apiUrl.StartsWith(prefix, StringComparison.OrdinalIgnoreCase))
+        {
+            return repoPage;
+        }
+
+        var parts = apiUrl[prefix.Length..].Split('/');
+        if (parts.Length < 4)
+        {
+            return repoPage;
+        }
+
+        var (owner, repo, kind, id) = (parts[0], parts[1], parts[2], parts[3]);
+
+        var webKind = kind switch
+        {
+            "pulls" => "pull",
+            "issues" => "issues",
+            "commits" => "commit",
+            _ => null,
+        };
+
+        return webKind is null
+            ? repoPage
+            : $"https://github.com/{owner}/{repo}/{webKind}/{id}";
+    }
+}
+
+/// <summary>
 /// One notification, as a row in the inbox.
 ///
 /// Whether it is unread is deliberately <em>not</em> part of
@@ -110,6 +156,14 @@ public sealed record GitHubNotification(
     /// into the name. Empty when read, so the element says nothing.
     /// </summary>
     public string UnreadIndicator => Unread ? "unread" : string.Empty;
+
+    /// <summary>
+    /// A github.com page to open for this notification, derived from the
+    /// subject's API url. Falls back to the repository page when the subject
+    /// has no clean web equivalent (a release's API url carries an id, not the
+    /// tag the web page is keyed on), so "open" always goes somewhere useful.
+    /// </summary>
+    public string? WebUrl => NotificationLinks.Web(Url, RepositoryFullName);
 
     /// <summary>The second line shown on screen, not spoken separately.</summary>
     public string Detail
