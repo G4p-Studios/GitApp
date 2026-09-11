@@ -29,6 +29,15 @@ public partial class MainPage : ContentPage
 
         DiffPane.EntryControl = DiffList;
 
+        // An empty list still holds a tab stop, and MAUI leaves it with no
+        // name and no automation peer, so tabbing onto it is silent. Give it
+        // the same words the placeholder shows on screen.
+        PlatformFocus.DescribeEmptyView(RepoList, "No repositories yet. Use Add repository to get started.");
+        PlatformFocus.DescribeEmptyView(UnstagedList, "Nothing unstaged");
+        PlatformFocus.DescribeEmptyView(StagedList, "Nothing staged");
+        PlatformFocus.DescribeEmptyView(DiffList, "No file selected. Choose a changed file to see its differences.");
+        PlatformFocus.DescribeEmptyView(HistoryList, "No commits");
+
         // The view model asks; the page owns the dialogs. Using the system
         // dialogs rather than custom ones means they are already keyboard
         // accessible and already familiar to screen reader users.

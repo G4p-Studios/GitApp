@@ -258,14 +258,27 @@ equivalent is a handler customisation or a small file under `Platforms/`.
 
 Two exist so far, both under `Platforms/Windows/`:
 
-- `PaneNavigation.Windows.cs` hooks F6, because MAUI has no cross-platform way
-  to observe a keystroke that no control has claimed.
-- `PlatformFocus.Windows.cs` focuses into a list, and remembers which row had
-  focus.
+- `PaneNavigation.Windows.cs` hooks F6 and F7, and the fold keys, because MAUI
+  has no cross-platform way to observe a keystroke that no control has
+  claimed.
+- `PlatformFocus.Windows.cs` focuses into a list, remembers which row had
+  focus, and names the control that hosts a `CollectionView`'s EmptyView.
 
-The rule for adding a third: prove the portable API cannot do it, and write
-down what you observed. Both files above carry that reasoning inline, because
-in both cases the obvious portable call appears to succeed while doing the
+That last one is worth stating, because it is a framework defect rather than
+a missing API. An empty `CollectionView` still holds a tab stop: MAUI's
+`EmptyViewContentControl`, which is `IsTabStop=True` and has **no automation
+peer at all**. Tab onto it and UI Automation reports the content island's
+root window, so a screen reader says nothing. Setting an automation name on
+it creates the peer; a localized control type of "status" stops it being
+announced as "custom".
+
+Skipping the stop would have been the easier fix and the wrong one. "There
+is nothing here" is real information, and the placeholder text on screen is
+how a sighted user gets it. So the stop stays and says the same words.
+
+The rule for adding a fourth: prove the portable API cannot do it, and write
+down what you observed. All of the above carry that reasoning inline, because
+in each case the obvious portable call appears to succeed while doing the
 wrong thing.
 
 ### 3.7 Verification

@@ -2,6 +2,7 @@ using Microsoft.UI.Xaml;
 using Microsoft.UI.Xaml.Controls;
 using Microsoft.UI.Xaml.Controls.Primitives;
 using Microsoft.UI.Xaml.Media;
+using WinAutomation = Microsoft.UI.Xaml.Automation.AutomationProperties;
 
 namespace GitApp.Accessibility;
 
@@ -141,6 +142,77 @@ public static partial class PlatformFocus
         {
             handled = selected.Focus(FocusState.Programmatic);
         }
+    }
+
+    static partial void DescribeEmptyViewPlatform(VisualElement element, string message)
+    {
+        void Apply()
+        {
+            if (element.Handler?.PlatformView is not DependencyObject root)
+            {
+                return;
+            }
+
+            // MAUI's CollectionView template always carries this control and
+            // only shows it when the list is empty, so it can be named once
+            // rather than tracked as items come and go.
+            if (FindByName(root, "EmptyViewContentControl") is not { } placeholder)
+            {
+                return;
+            }
+
+            WinAutomation.SetName(placeholder, message);
+
+            // Without a peer there is nothing for a screen reader to report
+            // even once it has a name. Naming it is what creates one, but
+            // say what it is too: the default would be an unhelpful
+            // "custom".
+            WinAutomation.SetLocalizedControlType(placeholder, "status");
+        }
+
+        // The template is not applied until the control loads, and the
+        // handler may not exist yet at construction.
+        if (element.Handler?.PlatformView is FrameworkElement loaded)
+        {
+            Apply();
+            loaded.Loaded += (_, _) => Apply();
+            return;
+        }
+
+        element.HandlerChanged += OnHandlerChanged;
+
+        void OnHandlerChanged(object? sender, EventArgs e)
+        {
+            element.HandlerChanged -= OnHandlerChanged;
+            Apply();
+
+            if (element.Handler?.PlatformView is FrameworkElement view)
+            {
+                view.Loaded += (_, _) => Apply();
+            }
+        }
+    }
+
+    private static FrameworkElement? FindByName(DependencyObject root, string name)
+    {
+        var count = VisualTreeHelper.GetChildrenCount(root);
+        for (var i = 0; i < count; i++)
+        {
+            var child = VisualTreeHelper.GetChild(root, i);
+
+            if (child is FrameworkElement element && element.Name == name)
+            {
+                return element;
+            }
+
+            var found = FindByName(child, name);
+            if (found is not null)
+            {
+                return found;
+            }
+        }
+
+        return null;
     }
 
     /// <summary>

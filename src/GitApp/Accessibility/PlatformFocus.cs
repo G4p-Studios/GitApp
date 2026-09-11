@@ -59,4 +59,24 @@ public static partial class PlatformFocus
     }
 
     static partial void TryFocusSelectedItemPlatform(VisualElement element, ref bool handled);
+
+    /// <summary>
+    /// Give an empty list's placeholder something to say.
+    ///
+    /// A CollectionView with no items still holds one tab stop: the control
+    /// that hosts the EmptyView. It has no automation peer, so tabbing onto
+    /// it moves focus to a thing UI Automation cannot describe, and a screen
+    /// reader says nothing at all. A silent stop is worse than either
+    /// alternative, because it is indistinguishable from the app having
+    /// stopped responding.
+    ///
+    /// Skipping it would be the easy fix and the wrong one: "there is
+    /// nothing here" is real information, and it is the one thing a sighted
+    /// user gets for free from the placeholder text on screen. So the stop
+    /// stays, and it says the same thing the placeholder does.
+    /// </summary>
+    public static void DescribeEmptyView(VisualElement element, string message) =>
+        DescribeEmptyViewPlatform(element, message);
+
+    static partial void DescribeEmptyViewPlatform(VisualElement element, string message);
 }
