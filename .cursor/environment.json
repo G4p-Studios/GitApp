@@ -1,0 +1,4 @@
+{
+  "name": "GitApp",
+  "install": "bash .cursor/install.sh"
+}
