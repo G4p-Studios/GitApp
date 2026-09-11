@@ -180,17 +180,44 @@ knows how far through they are, not just within the current hunk.
   stored as a setting but has no control yet, because a number nobody can
   reach is not yet a preference.
 
-## Not yet verified
+## Announce nothing the screen reader will already say
 
-The folding has been checked against the live UI Automation tree, which is
-where every accessibility bug in this project has been found so far. It has
-**not** been listened to through NVDA end to end. The one thing the tree
-cannot confirm is whether the state change is spoken at a useful moment
-rather than clipped by the next announcement.
+Folding was listened to through NVDA 2026.2 on 2026-09-11, and that caught
+something the UI Automation tree cannot show: **every step spoke twice.**
+
+```
+Difference 1 of 1, expanded, original line 100, 26 lines changed, modified line 100, 66 lines changed  1 of 87
+Difference 1 of 1 expanded, 86 lines
+```
+
+The first line is NVDA reading the row. The second is ours. The tree looks
+identical either way, because the duplication is in time, not in structure.
+
+The cause was a wrong prediction, written into a comment before it was
+tested: that a row which is already focused will not be re-read when only
+its name changes. NVDA does re-read it. And on F7, where focus genuinely
+moves, it was always going to.
+
+So the rule is now explicit, and it applies beyond the diff viewer:
+
+> Announce only what focus will not announce. If focus lands somewhere, or
+> the focused element's own name changes, the screen reader reads it. An
+> announcement on top of that is the same sentence twice.
+
+`MoveToDiffRow` announces only when `TryFocusSelectedItem` returns false,
+which happens when virtualization has left the row without a container and
+nothing would be read at all. The explicit announcements that remain are the
+ones where nothing moves: "No more differences" at the ends of the file.
 
 There is no ExpandCollapse pattern on the header rows. MAUI's CollectionView
 gives no way to supply one without replacing the item container, so the
-state is carried as the words "collapsed" and "expanded" in the name, which
-is what a screen reader would say from the pattern anyway, and the change is
-announced explicitly. If this proves not to be enough in practice, the fix
-is a custom automation peer on the Windows item container.
+state is carried as the words "collapsed" and "expanded" in the name. That
+turns out to be enough: it is what a screen reader would say from the
+pattern anyway, and NVDA re-reads the name on change, which is exactly the
+event the pattern would have raised. If another screen reader does not, the
+fix is a custom automation peer on the Windows item container.
+
+One known wart: pressing F7 twice past the last difference speaks once and
+then goes quiet, because the announcer drops identical consecutive
+messages. That rule exists to stop re-renders repeating themselves, and a
+deliberate second keypress is not a re-render.

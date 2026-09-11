@@ -224,18 +224,31 @@ native workarounds. That is one of the reasons the version floor is 0.84.
 
 ### 3.5 Announcements
 
-`Announcer` wraps two mechanisms:
+`Announcer` wraps two channels:
 
-- `AccessibilityInfo.announceForAccessibility` for discrete events: "Pushed 3
-  commits to origin/main", "Clone failed: authentication required".
-- `accessibilityLiveRegion` on a status element for progress that updates in
-  place, such as fetch and checkout progress. Use `polite` by default, and
-  `assertive` only for errors that stop the user's current task.
+- `SemanticScreenReader.Announce` for discrete events: "Pushed 3 commits to
+  origin/main", "Clone failed: authentication required".
+- The status line for progress that updates in place, such as fetch and
+  checkout progress. `Polite` by default, and `Assertive` only for errors that
+  stop the user's current task.
 
-Rules: no announcement fires more than once every 500 ms; progress announcements
-report meaningful milestones rather than every percent; and every long-running
-Git operation announces both start and completion, because silence reads as a
-hang.
+MAUI supplies the plumbing but no policy, and the policy was the hard part.
+
+Rules: no announcement fires more than once every 500 ms; identical
+consecutive messages are dropped, because they are almost always a re-render;
+progress announcements report meaningful milestones rather than every percent;
+and every long-running Git operation announces both start and completion,
+because silence reads as a hang.
+
+**Announce only what focus will not announce.** If focus lands somewhere, or
+the focused element's own name changes underneath it, the screen reader reads
+it, and an announcement on top of that is the same sentence twice. So the
+announcer is for things with no focused representation: an operation
+completing, an error, a key that deliberately did nothing. Code that moves
+focus and announces the destination is announcing it twice. This is invisible
+in the UI Automation tree, because the duplication is in time rather than in
+structure; it was found by listening, and it is the reason listening is not
+optional (3.7).
 
 ### 3.6 Dropping to the platform
 
@@ -286,6 +299,14 @@ Accessibility is verified by tests, not by intention.
 
 4. **Manual screen reader pass.** NVDA and Narrator, both, before any feature
    is called done. JAWS before each release.
+
+   This is not a formality on top of item 2, and the diff viewer's folding
+   proved it: the UI Automation tree was correct in every detail while every
+   fold and every jump was spoken twice, once by NVDA reading the row and
+   once by us announcing it. Duplication, timing, and anything clipped by the
+   next utterance exist only in the speech stream. Reading NVDA's Speech
+   Viewer is the cheap version of this, and the method is in
+   `docs/DEVELOPING.md`.
 
 CI gates on items 1 and 3. Items 2 and 4 gate the release.
 

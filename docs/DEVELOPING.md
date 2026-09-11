@@ -81,6 +81,18 @@ Speech Viewer) and read its edit control with `WM_GETTEXT`. Reading the UIA
 `Name` of that control does not work: it is capped at 4096 characters and
 returns a stale snapshot. It has no TextPattern either.
 
+**Do this as well as the tree, not instead of it, and not only at the end.**
+The tree shows structure; the Speech Viewer shows the sequence. The diff
+viewer's folding had a perfect tree while speaking every action twice, once
+as NVDA read the focused row and once as the app announced it. Nothing in
+the tree can show that, because the duplication is in time.
+
+Take a note of the buffer length before each keystroke and read only what is
+new after it, otherwise the earlier output drowns the step under test. Leave
+about 1.4 seconds between steps: the announcer coalesces anything inside its
+500 ms window, so faster keypresses measure the throttle rather than the
+feature.
+
 ## Known environment traps
 
 ### Foreground stealing blocks scripted keyboard tests

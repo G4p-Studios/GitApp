@@ -665,9 +665,11 @@ public sealed class MainViewModel : ObservableObject
         var position = $"Difference {row.HunkIndex + 1} of {_diff.Hunks.Count}";
         var lines = _diff.Hunks[row.HunkIndex].Lines.Count;
 
-        // The row is already focused, so a screen reader will not re-read it
-        // on its own. The announcement has to carry the position itself or
-        // the user is told "expanded" with no idea what expanded.
+        // A fallback only. The header's own name carries "expanded" or
+        // "collapsed", and a screen reader re-reads a focused row whose name
+        // changes, so this is normally never spoken. It exists for the case
+        // where the row has no container to focus and nothing would be read
+        // at all.
         return open ? $"{position} expanded, {lines} lines" : $"{position} collapsed";
     }
 

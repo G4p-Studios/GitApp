@@ -43,10 +43,9 @@ public partial class MainPage : ContentPage
         Announcer.Current.StatusChanged += (_, text) =>
             Dispatcher.Dispatch(() => StatusLabel.Text = text);
 
-        // F7 moves between differences. Announcing the landing row is
-        // deliberate: the list scrolls and selects, but a selection change
-        // alone is not always spoken, and silence after a keypress reads as
-        // the key having done nothing.
+        // F7 moves between differences. Running out of them is the one case
+        // that has to be announced, because nothing moves and silence after
+        // a keypress reads as the key having done nothing.
         PaneNavigation.HunkNavigator = direction =>
         {
             if (_vm.DiffRows.Count == 0)
@@ -66,21 +65,10 @@ public partial class MainPage : ContentPage
                 return true;
             }
 
-            var row = _vm.DiffRows[target];
-            DiffList.SelectedItem = row;
-            DiffList.ScrollTo(target, position: ScrollToPosition.Start, animate: false);
-
-            // Selecting does not focus. Without moving focus too, F7 would
-            // announce the destination and leave the user behind, unable to
-            // read on from where they landed. Deferred a frame so the row is
-            // realized after the scroll before we try to focus it.
-            Dispatcher.Dispatch(() =>
-            {
-                PlatformFocus.TryFocusSelectedItem(DiffList);
-                Announcer.Current.Announce(row.AccessibleName);
-            });
-
-            return true;
+            // Landing at the top leaves the rest of the difference below the
+            // cursor, ready to read on.
+            return MoveToDiffRow(
+                target, _vm.DiffRows[target].AccessibleName, ScrollToPosition.Start);
         };
 
         // Folding a large difference. The header keeps its row index either
@@ -123,22 +111,35 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>
-    /// Select, scroll to, focus and announce one diff row.
+    /// Select, scroll to and focus one diff row, announcing it only if focus
+    /// did not actually land there.
     ///
-    /// Selecting does not focus, and focusing without saying anything reads
-    /// as the key having done nothing. Both halves are needed every time, so
-    /// they live together. Deferred a frame because a row has no container
-    /// to focus until the scroll has realized it.
+    /// Selecting does not focus, so the focus call is always needed. The
+    /// announcement almost never is: once focus moves, or the focused row's
+    /// name changes underneath it, the screen reader reads the row itself,
+    /// and announcing on top of that says the same thing twice. Listening
+    /// through NVDA is the only way this shows up; the UI Automation tree
+    /// looks identical either way.
+    ///
+    /// Deferred a frame because a row has no container to focus until the
+    /// scroll has realized it.
     /// </summary>
-    private bool MoveToDiffRow(int index, string announcement)
+    private bool MoveToDiffRow(
+        int index,
+        string fallbackAnnouncement,
+        ScrollToPosition position = ScrollToPosition.MakeVisible)
     {
         DiffList.SelectedItem = _vm.DiffRows[index];
-        DiffList.ScrollTo(index, position: ScrollToPosition.MakeVisible, animate: false);
+        DiffList.ScrollTo(index, position: position, animate: false);
 
         Dispatcher.Dispatch(() =>
         {
-            PlatformFocus.TryFocusSelectedItem(DiffList);
-            Announcer.Current.Announce(announcement);
+            if (!PlatformFocus.TryFocusSelectedItem(DiffList))
+            {
+                // Virtualization can leave the row without a container.
+                // Nothing will be read, so say it.
+                Announcer.Current.Announce(fallbackAnnouncement);
+            }
         });
 
         return true;
