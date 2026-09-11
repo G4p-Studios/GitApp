@@ -23,6 +23,7 @@ public sealed class MainViewModel : ObservableObject
 
     private FileDiff _diff = FileDiff.Empty;
     private GitHubSession? _github;
+    private NotificationService? _notifications;
 
     private RepositoryItem? _selectedRepository;
     private string _commitMessage = string.Empty;
@@ -304,6 +305,14 @@ public sealed class MainViewModel : ObservableObject
         deviceFlowClientId: _settings.Settings.GitHubClientId);
 
     /// <summary>
+    /// The notification poll loop, shared by the toast and the inbox screen
+    /// so both watch the same list. Built on the same session, and started
+    /// once; it idles until signed in and then polls in the background
+    /// (docs/NOTIFICATIONS.md).
+    /// </summary>
+    public NotificationService Notifications => _notifications ??= new NotificationService(GitHub);
+
+    /// <summary>
     /// Add a repository cloned from somewhere else in the app, and select
     /// it. Cloning something and then having to go and find it by hand is
     /// the sort of gap that only shows up in real use.
@@ -359,6 +368,11 @@ public sealed class MainViewModel : ObservableObject
         {
             item.Status = await _git.GetStatusAsync(item.Path);
         }
+
+        // Start the notification loop. It self-guards on being signed in, so
+        // starting it here — whether or not a session was restored — is
+        // enough; it wakes up on its own once a token is in place.
+        Notifications.Start();
     }
 
     private async Task AddRepositoryAsync()

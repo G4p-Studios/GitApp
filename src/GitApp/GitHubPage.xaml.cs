@@ -9,14 +9,17 @@ namespace GitApp;
 public partial class GitHubPage : ContentPage
 {
     private readonly GitHubSession _session;
+    private readonly NotificationService _notifications;
     private readonly GitHubViewModel _vm;
+    private NotificationsPage? _notificationsPage;
     private bool _initialised;
 
-    public GitHubPage(GitHubSession session)
+    public GitHubPage(GitHubSession session, NotificationService notifications)
     {
         InitializeComponent();
 
         _session = session;
+        _notifications = notifications;
         _vm = new GitHubViewModel(session);
         BindingContext = _vm;
 
@@ -115,5 +118,23 @@ public partial class GitHubPage : ContentPage
         var page = new RepositoryPage(_session, repo);
         page.Cloned += (_, path) => Cloned?.Invoke(this, path);
         AppNavigator.Show(page);
+    }
+
+    /// <summary>
+    /// Open the notifications inbox. Kept rather than rebuilt, so returning to
+    /// it does not lose the user's place in the list.
+    /// </summary>
+    private void OnOpenNotifications(object? sender, EventArgs e) => ShowNotifications();
+
+    /// <summary>Open the inbox and, when a toast sent us here, land on its row.</summary>
+    public void ShowNotifications(string? threadId = null)
+    {
+        _notificationsPage ??= new NotificationsPage(_notifications);
+        AppNavigator.Show(_notificationsPage);
+
+        if (!string.IsNullOrEmpty(threadId))
+        {
+            _notificationsPage.FocusThread(threadId);
+        }
     }
 }

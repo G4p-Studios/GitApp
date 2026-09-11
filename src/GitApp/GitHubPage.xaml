@@ -30,6 +30,11 @@
                     Command="{Binding RefreshCommand}"
                     MinimumHeightRequest="32"
                     SemanticProperties.Hint="Fetches your repository list from GitHub again" />
+            <Button x:Name="NotificationsButton"
+                    Text="Notifications"
+                    Clicked="OnOpenNotifications"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens your GitHub notifications inbox" />
         </HorizontalStackLayout>
 
         <!-- Account -->

@@ -1,20 +1,40 @@
 # Notifications
 
-Status: service layer built and unit-tested, 2026-09-11. Milestone 5, first
-slice. The Windows toast and the in-app inbox screen are not built yet; this
-document covers the polling and model layer they will sit on, which lives in
-`GitApp.Core` and is testable without a window.
+Status: 2026-09-11. Milestone 5. The polling and model layer is built and
+unit-tested in `GitApp.Core`. The Windows toast, the poll loop, and the in-app
+inbox screen are written but **unverified**: they live in the MAUI app, which
+targets Windows and macOS and cannot be built or screen-reader-tested on the
+Linux Cloud Agent. Nothing in the toast-and-inbox section below counts as done
+under the one rule in `AGENTS.md` until a Windows run confirms it in NVDA. The
+Windows checklist is at the end.
 
-## What is built
+## What is built and tested (GitApp.Core)
 
 - `GitHubClient.GetNotificationsAsync` — a conditional poll of
   `GET /notifications` that returns a `NotificationPage`.
 - `GitHubClient.MarkThreadReadAsync` — mark one thread read, as opening it on
   github.com does.
-- `NotificationPoller` (`Services/`) — when to poll next, and which
-  notifications are new enough to announce.
-- `GitHubNotification` and `NotificationPage` (`Domain/`) — the row and the
-  poll result, each owning its own reading string.
+- `NotificationPoller` — when to poll next, and which notifications are new
+  enough to announce.
+- `NotificationInbox` — holds the inbox and merges each poll in place, reporting
+  only what moved (ARCHITECTURE 4.6) so the view keeps untouched rows.
+- `GitHubNotification`, `NotificationPage`, `NotificationLinks` — the row, the
+  poll result, and the API-url-to-web-url mapping, each testable without a
+  window.
+
+## What is written but unverified (the MAUI app)
+
+- `ToastModule` — a Windows toast per new notification, over Windows App SDK
+  app notifications, with a portable no-op default. Activation carries the
+  thread id back so a toast opens the inbox on the right row.
+- `NotificationService` — the app-wide background poll loop: a dispatcher timer
+  that wakes every fifteen seconds, asks the scheduler whether a poll is due,
+  and drives the client, the poller, the inbox and the toast. Self-guarding, so
+  it idles while signed out.
+- `NotificationsPage` and `NotificationsViewModel` — the inbox screen, an F6
+  `Inbox` pane listing unread notifications newest first, each openable on
+  github.com or markable read. Reached from a Notifications button on the
+  GitHub screen.
 
 ## Polling done the way GitHub asks
 
@@ -103,17 +123,37 @@ underscore is not something the listener can act on. An unfamiliar reason falls
 back to its own words with the underscores spoken as spaces
 (`NotificationReason.Word`).
 
-## What is not built, and needs a Windows run
+## The Windows checklist — what a run still has to confirm
 
-- **The toast.** Windows App SDK app notifications need package identity;
-  ARCHITECTURE 4.4 records that GitApp ships a sparse package for exactly this.
-  The toast is a convenience, and its activation must route through a protocol
-  handler into the relevant screen with focus on the item, not the window root.
-- **The inbox screen.** The real surface, because toasts are transient and easy
-  to miss. A fully accessible list of `GitHubNotification` rows, an F6 pane like
-  every other screen, with mark-as-read and open on each row.
-- **Live verification.** Everything here is tested against recorded JSON and
-  scripted responses. The 304 path, the `X-Poll-Interval` honouring, and the
-  backoff are exactly the behaviours a live account will not show you on demand,
-  which is why they are unit-tested rather than left for a manual pass — but the
-  success path has not yet been seen against a real inbox with a real token.
+None of the MAUI code above has been compiled or heard, because the Cloud Agent
+is Linux and the app targets Windows. A Windows run has to confirm, in NVDA and
+Narrator both:
+
+- **It builds.** `dotnet build src/GitApp/GitApp.csproj -f
+  net10.0-windows10.0.19041.0` with the tree still at zero warnings. The toast
+  module assumes the Windows App SDK's `Microsoft.Windows.AppNotifications`
+  namespace is on the Windows target; confirm it resolves.
+- **The toast appears and reads.** A new notification raises a toast whose title
+  and body are spoken as words, in the same content order as the inbox row.
+  Because the app is unpackaged (`WindowsPackageType=None`), confirm
+  `AppNotificationManager.Register()` succeeds; ARCHITECTURE 4.4 anticipates a
+  sparse package for persistent identity, which activation after exit needs.
+- **Activation lands on the item.** Invoking a toast opens the inbox with focus
+  on the notification it named, not on the window root or the list top.
+- **The inbox reads as a screen, not a duplicate.** F6 reaches the Inbox pane
+  and announces it; rows read content-first with unread as a separate element;
+  a background poll that updates the list does not move the cursor or re-read
+  rows the user already heard (ARCHITECTURE 3.3, 3.5, 4.6). The diff viewer's
+  double-speak is the failure to watch for — read the Speech Viewer, not just
+  the tree.
+- **Mark read and open behave.** Mark read updates the row and the heading in
+  place; open reaches github.com; the toast does not also speak on top of the
+  screen reader reading it.
+
+## Live verification against a real account
+
+Everything in `GitApp.Core` is tested against recorded JSON and scripted
+responses. The 304 path, the `X-Poll-Interval` honouring, and the backoff are
+the behaviours a live account will not show on demand, which is why they are
+unit-tested rather than left for a manual pass — but the success path has not
+been seen against a real inbox with a real token, and needs one.

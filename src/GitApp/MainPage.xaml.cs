@@ -176,13 +176,30 @@ public partial class MainPage : ContentPage
     /// </summary>
     private void OnOpenGitHub(object? sender, EventArgs e)
     {
-        if (_gitHubPage is null)
+        EnsureGitHubPage();
+        AppNavigator.Show(_gitHubPage!);
+    }
+
+    private void EnsureGitHubPage()
+    {
+        if (_gitHubPage is not null)
         {
-            _gitHubPage = new GitHubPage(_vm.GitHub);
-            _gitHubPage.Cloned += async (_, path) => await _vm.AdoptClonedRepositoryAsync(path);
+            return;
         }
 
-        AppNavigator.Show(_gitHubPage);
+        _gitHubPage = new GitHubPage(_vm.GitHub, _vm.Notifications);
+        _gitHubPage.Cloned += async (_, path) => await _vm.AdoptClonedRepositoryAsync(path);
+    }
+
+    /// <summary>
+    /// Open the inbox on a particular notification, for a toast activated
+    /// anywhere in the app. Builds the GitHub screen first if it does not
+    /// exist yet, so a toast works even before the user has opened GitHub.
+    /// </summary>
+    private void OpenInbox(string threadId)
+    {
+        EnsureGitHubPage();
+        _gitHubPage!.ShowNotifications(threadId);
     }
 
     protected override async void OnAppearing()
@@ -205,6 +222,14 @@ public partial class MainPage : ContentPage
         _initialised = true;
 
         await _vm.InitialiseAsync();
+
+        // Subscribe after Initialise, which loads settings and starts the
+        // notification loop: touching the service earlier would build the
+        // GitHub session before the browser sign-in client id is loaded. A
+        // toast activated from anywhere then opens the inbox on the
+        // notification it named, even before the user has opened GitHub.
+        _vm.Notifications.OpenRequested += (_, threadId) =>
+            Dispatcher.Dispatch(() => OpenInbox(threadId));
 
         // Focus after the data is in place, so focus lands on a real row
         // rather than on an empty list. Deferred a frame because panes

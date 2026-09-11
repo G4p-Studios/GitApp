@@ -1,0 +1,102 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             x:Class="GitApp.NotificationsPage"
+             x:DataType="vm:NotificationsViewModel"
+             Title="Notifications">
+
+    <!--
+      One pane, Inbox: the unread notifications, newest first. The inbox is
+      the real surface for notifications, because a toast is transient and
+      easy to miss (ARCHITECTURE 4.4). Each row can be opened on github.com
+      or marked read, the two actions github.com itself offers.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto">
+
+        <HorizontalStackLayout Grid.Row="0" Padding="12,8" Spacing="8">
+            <Button x:Name="BackButton"
+                    Text="Back"
+                    Clicked="OnBack"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to the previous screen. Escape does the same." />
+            <Button Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Checks GitHub for new notifications now" />
+            <Button Text="Mark all read"
+                    Command="{Binding MarkAllReadCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Marks every notification in the list read" />
+        </HorizontalStackLayout>
+
+        <a11y:Pane x:Name="InboxPane"
+                   Grid.Row="1"
+                   PaneId="notifications-inbox" PaneName="Inbox" PaneOrder="10">
+            <Grid RowDefinitions="Auto,*" Padding="12">
+                <Label Grid.Row="0"
+                       Text="{Binding Heading}"
+                       FontSize="20"
+                       Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level1" />
+
+                <CollectionView Grid.Row="1"
+                                x:Name="InboxList"
+                                ItemsSource="{Binding Items}"
+                                SelectedItem="{Binding Selected, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Notifications">
+                    <CollectionView.EmptyView>
+                        <Label Text="No unread notifications"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:GitHubNotification">
+                            <Grid ColumnDefinitions="*,Auto,Auto" Padding="8,6"
+                                  ColumnSpacing="6"
+                                  SemanticProperties.Description="{Binding AccessibleName}">
+                                <VerticalStackLayout Grid.Column="0">
+                                    <Label Text="{Binding Title}" FontSize="14" />
+                                    <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                                </VerticalStackLayout>
+
+                                <!--
+                                  The unread flag as its own element, not part
+                                  of the row name, so flipping it read does not
+                                  re-read the whole row (ARCHITECTURE 3.3).
+                                -->
+                                <Label Grid.Column="1"
+                                       Text="{Binding UnreadIndicator}"
+                                       FontSize="12"
+                                       VerticalOptions="Center"
+                                       SemanticProperties.Description="{Binding UnreadIndicator}" />
+
+                                <HorizontalStackLayout Grid.Column="2" Spacing="4">
+                                    <Button Text="Open"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.OpenCommand}"
+                                            CommandParameter="{Binding .}"
+                                            FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                            SemanticProperties.Description="{Binding Title, StringFormat='Open {0}'}"
+                                            SemanticProperties.Hint="Opens this on github.com in your browser" />
+                                    <Button Text="Mark read"
+                                            Command="{Binding Source={RelativeSource AncestorType={x:Type ContentPage}}, Path=BindingContext.MarkReadCommand}"
+                                            CommandParameter="{Binding .}"
+                                            FontSize="12" Padding="8,0" MinimumHeightRequest="28"
+                                            SemanticProperties.Description="{Binding Title, StringFormat='Mark read {0}'}" />
+                                </HorizontalStackLayout>
+                            </Grid>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

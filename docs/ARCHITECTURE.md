@@ -501,9 +501,12 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    model layer is built and unit-tested in `GitApp.Core`: a conditional
    `GET /notifications` that honours `If-Modified-Since`, `X-Poll-Interval`
    and 304, a scheduler that backs off on secondary rate limits and decides
-   which threads are new enough to announce, and the notification row model
-   (`docs/NOTIFICATIONS.md`). The Windows toast and the in-app inbox screen
-   are not built.
+   which threads are new enough to announce, an inbox that merges polls in
+   place, and the notification row model (`docs/NOTIFICATIONS.md`). The
+   Windows toast, the background poll loop and the in-app inbox screen are
+   written but unverified: they are MAUI-app code, which cannot be built or
+   heard on the Linux Cloud Agent, and need a Windows run in NVDA before
+   they count as done. The checklist is in `docs/NOTIFICATIONS.md`.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.
 
 Pull still fast-forwards first, because a fast-forward cannot conflict and so
