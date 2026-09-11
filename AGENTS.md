@@ -112,6 +112,8 @@ that is not in the foreground: `docs/DEVELOPING.md`.
 - `docs/ISSUES.md` — issues and pull requests: reading, commenting,
   close and reopen, merge, review.
 - `docs/RELEASES.md` — the releases list and creating a release.
+- `docs/NOTIFICATIONS.md` — notification polling, the poll scheduler, and
+  the notification row model.
 - `docs/DEVELOPING.md` — prerequisites, build, verification method, traps.
 - `docs/SPIKE-MAUI.md` — the measurements behind the framework choice.
 
@@ -137,6 +139,13 @@ commenting, close and reopen, merge with a method choice, and
 approve/request-changes reviews on the conversation screen
 (`docs/ISSUES.md`); the releases list and creating a release, opened
 from the About pane (`docs/RELEASES.md`).
+
+Milestone 5, notifications, is in progress. The polling and model layer is
+built and unit-tested in `GitApp.Core`: a conditional `GET /notifications`
+that honours `If-Modified-Since`, `X-Poll-Interval` and 304, a poll scheduler
+that backs off on secondary rate limits and decides which threads are new
+enough to announce, and the notification row model (`docs/NOTIFICATIONS.md`).
+The Windows toast and the in-app inbox screen are not built yet.
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

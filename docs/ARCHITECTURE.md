@@ -497,7 +497,13 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    are built (`docs/ISSUES.md`); the releases list and creating a
    release are built (`docs/RELEASES.md`). None of it has yet been
    exercised against a real repository.
-5. **Notifications.** Polling, toasts, inbox.
+5. **Notifications.** Polling, toasts, inbox. In progress. The polling and
+   model layer is built and unit-tested in `GitApp.Core`: a conditional
+   `GET /notifications` that honours `If-Modified-Since`, `X-Poll-Interval`
+   and 304, a scheduler that backs off on secondary rate limits and decides
+   which threads are new enough to announce, and the notification row model
+   (`docs/NOTIFICATIONS.md`). The Windows toast and the in-app inbox screen
+   are not built.
 6. **Beyond GitHub.** GitLab and Codeberg behind the existing domain models.
 
 Pull still fast-forwards first, because a fast-forward cannot conflict and so
