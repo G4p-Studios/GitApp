@@ -1,12 +1,14 @@
 # Signing in, and the remote repository list
 
 Status: built and verified as far as an account allows, 2026-09-11.
-Milestone 3, first slice.
+Milestone 3, first slice. Home is now the front door (`docs/HOME.md`);
+this screen is still the full remote repository list, reached from Places
+or the command palette.
 
 ## What works
 
-Press GitHub on the toolbar. The screen has two panes, cycled with F6:
-Account and Repositories. Escape goes back.
+The GitHub screen has two panes, cycled with F6: Account and Repositories.
+Escape goes back.
 
 Sign in with a personal access token, and the list of every repository the
 account owns, collaborates on, or reaches through an organization appears,

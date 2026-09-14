@@ -470,7 +470,7 @@ underneath the user's cursor as the result of a background refresh.
   - `Domain/` - provider-agnostic models.
   - `Services/` - GitHubClient, GitService, NotificationService, AuthService.
   - `Theme/` - spacing, type and metric tokens.
-  - `Platforms/Windows/` - the F6 key hook and the focus helpers.
+  - `Platforms/Windows/` - the F6 key hook, Control+Shift+P, and the focus helpers.
   - `Platforms/MacCatalyst/` - the macOS equivalents, once Catalyst is verified.
 - `src/GitApp.Core/` - Domain and Services, with no UI framework dependency,
   so the logic is testable and survives a change of shell.
@@ -489,9 +489,10 @@ supplies it, and the theme rule in 3.8 is what keeps it working.
    creation, conflict resolution, and the diff viewer with folding and a
    context setting, all against real repositories through git.exe.
 3. **GitHub read.** Auth, repository browse, issues, pull requests, code
-   view. Sign-in, the remote repository list (`docs/GITHUB.md`), the
-   repository screen and file view (`docs/REPOSITORY-VIEW.md`), and
-   issues and pull requests (`docs/ISSUES.md`) are built.
+   view. The window opens on Home (`docs/HOME.md`). Sign-in, the remote
+   repository list (`docs/GITHUB.md`), the repository screen and file
+   view (`docs/REPOSITORY-VIEW.md`), and issues and pull requests
+   (`docs/ISSUES.md`) are built. Control+Shift+P is the command palette.
 4. **GitHub write.** Comment, review, merge, release management.
    Commenting, close and reopen, merge, and whole-pull-request review
    are built (`docs/ISSUES.md`); the releases list and creating a

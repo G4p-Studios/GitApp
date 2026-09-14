@@ -88,12 +88,6 @@ public partial class NotificationsPage : ContentPage
 
     private bool HandleBack()
     {
-        if (AppNavigator.GoBack())
-        {
-            Announcer.Current.Announce("GitHub");
-            return true;
-        }
-
-        return false;
+        return AppNavigator.GoBack();
     }
 }

@@ -90,10 +90,7 @@ public partial class GitHubPage : ContentPage
 
     private static void GoBack()
     {
-        if (AppNavigator.GoBack())
-        {
-            Announcer.Current.Announce("Local repositories");
-        }
+        AppNavigator.GoBack();
     }
 
     private async void OnCreateToken(object? sender, EventArgs e)

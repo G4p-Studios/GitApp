@@ -22,6 +22,10 @@
         <!-- Toolbar spanning the top -->
         <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="4"
                                Padding="12,8" Spacing="8">
+            <Button Text="Home"
+                    Clicked="OnHome"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Returns to your GitHub home. Escape does the same." />
             <Button Text="Add repository"
                     Command="{Binding AddRepositoryCommand}"
                     MinimumHeightRequest="32"

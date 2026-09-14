@@ -46,6 +46,23 @@ public static partial class PaneNavigation
 
     private static void OnPreviewKeyDown(object sender, KeyRoutedEventArgs e)
     {
+        var shift = InputKeyboardSource
+            .GetKeyStateForCurrentThread(VirtualKey.Shift)
+            .HasFlag(CoreVirtualKeyStates.Down);
+        var control = InputKeyboardSource
+            .GetKeyStateForCurrentThread(VirtualKey.Control)
+            .HasFlag(CoreVirtualKeyStates.Down);
+
+        // Control+Shift+P, the command palette. Checked before the F6
+        // filter so P is not dropped on the floor. Same shortcut as VS Code
+        // and Quill (docs/HOME.md).
+        if (e.Key == VirtualKey.P && shift && control)
+        {
+            GitApp.Services.AppHost.ToggleCommandPalette();
+            e.Handled = true;
+            return;
+        }
+
         if (e.Key is not (VirtualKey.F6 or VirtualKey.F7 or VirtualKey.Enter
             or VirtualKey.Space or VirtualKey.Right or VirtualKey.Left
             or VirtualKey.Escape))
@@ -66,16 +83,10 @@ public static partial class PaneNavigation
             return;
         }
 
-        var shift = InputKeyboardSource
-            .GetKeyStateForCurrentThread(VirtualKey.Shift)
-            .HasFlag(CoreVirtualKeyStates.Down);
-
         // Control+Enter posts a comment from inside the editor. Checked
         // before plain Enter, and handled so the editor does not also
         // insert a line break into the text that was just sent.
-        if (e.Key == VirtualKey.Enter
-            && InputKeyboardSource.GetKeyStateForCurrentThread(VirtualKey.Control)
-                .HasFlag(CoreVirtualKeyStates.Down))
+        if (e.Key == VirtualKey.Enter && control)
         {
             if (Submit())
             {

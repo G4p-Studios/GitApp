@@ -127,7 +127,9 @@ public sealed class FocusManager
         _activePaneId = null;
     }
 
-    public PaneRegistration? FirstPane => _panes.FirstOrDefault();
+    public PaneRegistration? FirstPane => _panes.FirstOrDefault(Visible);
+
+    private static bool Visible(PaneRegistration pane) => pane.Container.IsVisible;
 
     public PaneRegistration? ActivePane => _activePaneId is null ? null : Find(_activePaneId);
 
@@ -142,21 +144,22 @@ public sealed class FocusManager
         // One pane still has to be reachable. The notifications inbox has
         // Back / Refresh sitting outside it, and F6 is how you return from
         // those. Doing nothing when Count < 2 left the user stranded on Back.
-        if (_panes.Count == 0)
+        var reachable = _panes.Where(Visible).ToList();
+        if (reachable.Count == 0)
         {
             return null;
         }
 
-        if (_panes.Count == 1)
+        if (reachable.Count == 1)
         {
-            Enter(_panes[0], announce: true);
-            return _panes[0];
+            Enter(reachable[0], announce: true);
+            return reachable[0];
         }
 
-        var currentIndex = _panes.FindIndex(p => p.Id == _activePaneId);
+        var currentIndex = reachable.FindIndex(p => p.Id == _activePaneId);
         var from = currentIndex < 0 ? 0 : currentIndex;
-        var index = ((from + direction) % _panes.Count + _panes.Count) % _panes.Count;
-        var next = _panes[index];
+        var index = ((from + direction) % reachable.Count + reachable.Count) % reachable.Count;
+        var next = reachable[index];
 
         Enter(next, announce: true);
         return next;

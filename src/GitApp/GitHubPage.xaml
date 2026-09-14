@@ -22,10 +22,10 @@
         <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
                                Padding="12,8" Spacing="8">
             <Button x:Name="BackButton"
-                    Text="Back to repositories"
+                    Text="Back"
                     Clicked="OnBack"
                     MinimumHeightRequest="32"
-                    SemanticProperties.Hint="Returns to your local repositories. Escape does the same." />
+                    SemanticProperties.Hint="Returns to the previous screen. Escape does the same." />
             <Button Text="Refresh"
                     Command="{Binding RefreshCommand}"
                     MinimumHeightRequest="32"

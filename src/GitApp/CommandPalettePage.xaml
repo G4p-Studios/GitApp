@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             x:Class="GitApp.CommandPalettePage"
+             x:DataType="vm:CommandPaletteViewModel"
+             Title="Commands">
+
+    <!--
+      Control+Shift+P. Type to filter, arrow to a command, Enter to run,
+      Escape to close. Matches VS Code and Quill.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto">
+        <a11y:Pane x:Name="CommandsPane"
+                   Grid.Row="0" Grid.RowSpan="2"
+                   PaneId="commands" PaneName="Commands" PaneOrder="10">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+                <Label Text="{Binding Heading}" FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+
+                <Entry Grid.Row="1" x:Name="SearchEntry"
+                       Text="{Binding Query, Mode=TwoWay}"
+                       Placeholder="Search commands"
+                       Margin="0,8,0,8"
+                       SemanticProperties.Description="Search commands"
+                       SemanticProperties.Hint="Type to filter. Tab to the list, arrow to a command, Enter to run. Escape closes. Control Shift P does the same." />
+
+                <CollectionView Grid.Row="2" x:Name="CommandList"
+                                ItemsSource="{Binding Items}"
+                                SelectedItem="{Binding Selected, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Commands">
+                    <CollectionView.EmptyView>
+                        <Label Text="No matching commands"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:PaletteItem">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Title}" FontSize="14" />
+                                <Label Text="{Binding Category}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

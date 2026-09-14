@@ -7,14 +7,14 @@ namespace GitApp;
 
 public partial class MainPage : ContentPage
 {
-    private readonly MainViewModel _vm = new();
+    private readonly MainViewModel _vm;
 
-    private GitHubPage? _gitHubPage;
     private bool _initialised;
 
     public MainPage()
     {
         InitializeComponent();
+        _vm = AppHost.Main;
         BindingContext = _vm;
 
         // Each pane hands focus to its most useful control, so F6 lands on
@@ -168,39 +168,13 @@ public partial class MainPage : ContentPage
     }
 
     /// <summary>
-    /// Opening the GitHub screen.
-    ///
-    /// The page is kept rather than rebuilt, so going back and forth does
-    /// not re-sign-in, refetch the repository list, or lose a filter the
-    /// user typed.
+    /// Opening the GitHub repository list. Kept as a jump from this screen
+    /// as well as from Home, so muscle memory from the old toolbar still
+    /// works.
     /// </summary>
-    private void OnOpenGitHub(object? sender, EventArgs e)
-    {
-        EnsureGitHubPage();
-        AppNavigator.Show(_gitHubPage!);
-    }
+    private void OnOpenGitHub(object? sender, EventArgs e) => AppHost.ShowGitHub();
 
-    private void EnsureGitHubPage()
-    {
-        if (_gitHubPage is not null)
-        {
-            return;
-        }
-
-        _gitHubPage = new GitHubPage(_vm.GitHub, _vm.Notifications);
-        _gitHubPage.Cloned += async (_, path) => await _vm.AdoptClonedRepositoryAsync(path);
-    }
-
-    /// <summary>
-    /// Open the inbox on a particular notification, for a toast activated
-    /// anywhere in the app. Builds the GitHub screen first if it does not
-    /// exist yet, so a toast works even before the user has opened GitHub.
-    /// </summary>
-    private void OpenInbox(string threadId)
-    {
-        EnsureGitHubPage();
-        _gitHubPage!.ShowNotifications(threadId);
-    }
+    private void OnHome(object? sender, EventArgs e) => AppHost.ShowHome();
 
     protected override async void OnAppearing()
     {
@@ -208,6 +182,11 @@ public partial class MainPage : ContentPage
 
         // This screen owns the panes and the keys again.
         PaneNavigation.Attach(this);
+        PaneNavigation.BackHandler = () =>
+        {
+            AppHost.ShowHome();
+            return true;
+        };
         WireKeys();
 
         if (_initialised)
@@ -222,14 +201,6 @@ public partial class MainPage : ContentPage
         _initialised = true;
 
         await _vm.InitialiseAsync();
-
-        // Subscribe after Initialise, which loads settings and starts the
-        // notification loop: touching the service earlier would build the
-        // GitHub session before the browser sign-in client id is loaded. A
-        // toast activated from anywhere then opens the inbox on the
-        // notification it named, even before the user has opened GitHub.
-        _vm.Notifications.OpenRequested += (_, threadId) =>
-            Dispatcher.Dispatch(() => OpenInbox(threadId));
 
         // Focus after the data is in place, so focus lands on a real row
         // rather than on an empty list. Deferred a frame because panes

@@ -332,8 +332,23 @@ public sealed class MainViewModel : ObservableObject
         SelectedRepository = item;
     }
 
-    public async Task InitialiseAsync()
+    private bool _hostReady;
+    private bool _initialised;
+
+    /// <summary>
+    /// Settings, the GitHub session, and the notification loop. Home needs
+    /// this before the feed can load; it must not wait on inspecting every
+    /// local clone.
+    /// </summary>
+    public async Task InitialiseHostAsync()
     {
+        if (_hostReady)
+        {
+            return;
+        }
+
+        _hostReady = true;
+
         await _settings.LoadAsync();
         Raise(nameof(ContextLines));
 
@@ -341,6 +356,22 @@ public sealed class MainViewModel : ObservableObject
         {
             _announcer.SetStatus(settingsProblem);
         }
+
+        // Restore before starting the loop, so the first poll has a token.
+        await GitHub.RestoreAsync();
+        Notifications.Start();
+    }
+
+    public async Task InitialiseAsync()
+    {
+        if (_initialised)
+        {
+            return;
+        }
+
+        _initialised = true;
+
+        await InitialiseHostAsync();
 
         await _store.LoadAsync();
 
@@ -368,11 +399,6 @@ public sealed class MainViewModel : ObservableObject
         {
             item.Status = await _git.GetStatusAsync(item.Path);
         }
-
-        // Start the notification loop. It self-guards on being signed in, so
-        // starting it here — whether or not a session was restored — is
-        // enough; it wakes up on its own once a token is in place.
-        Notifications.Start();
     }
 
     private async Task AddRepositoryAsync()

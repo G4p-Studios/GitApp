@@ -1,0 +1,154 @@
+<?xml version="1.0" encoding="utf-8" ?>
+<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             xmlns:a11y="clr-namespace:GitApp.Accessibility"
+             xmlns:vm="clr-namespace:GitApp.ViewModels"
+             xmlns:domain="clr-namespace:GitApp.Domain"
+             x:Class="GitApp.DashboardPage"
+             x:DataType="vm:DashboardViewModel"
+             Title="Home">
+
+    <!--
+      Home, the way github.com's dashboard is laid out: places and top
+      repositories on the left, the feed in the middle. F6 cycles Places,
+      Top repositories, Feed. Control+Shift+P is the command palette.
+    -->
+
+    <Grid RowDefinitions="Auto,*,Auto" ColumnDefinitions="280,*">
+
+        <HorizontalStackLayout Grid.Row="0" Grid.ColumnSpan="2"
+                               Padding="12,8" Spacing="8">
+            <Button Text="Refresh"
+                    Command="{Binding RefreshCommand}"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Reloads your feed and top repositories from GitHub" />
+            <Button Text="Notifications"
+                    Clicked="OnNotifications"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens your GitHub notifications inbox" />
+            <Button Text="Commands"
+                    Clicked="OnCommands"
+                    MinimumHeightRequest="32"
+                    SemanticProperties.Hint="Opens the command palette. Control Shift P does the same." />
+            <Button Text="Sign out"
+                    Command="{Binding SignOutCommand}"
+                    IsVisible="{Binding IsSignedIn}"
+                    MinimumHeightRequest="32" />
+        </HorizontalStackLayout>
+
+        <Grid Grid.Row="1" Grid.Column="0" RowDefinitions="*,*">
+        <a11y:Pane x:Name="PlacesPane"
+                   PaneId="home-places" PaneName="Places" PaneOrder="10">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+                <Label Text="GitApp" FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+                <Label Grid.Row="1" Text="{Binding Status}" FontSize="14"
+                       Opacity="0.8" Margin="0,0,0,8"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="2" x:Name="PlacesList"
+                                ItemsSource="{Binding Places}"
+                                SelectedItem="{Binding SelectedPlace, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Places">
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="vm:DashboardPlace">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Title}" FontSize="14" />
+                                <Label Text="{Binding Hint}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <a11y:Pane x:Name="TopPane"
+                   Grid.Row="1"
+                   PaneId="home-top" PaneName="Top repositories" PaneOrder="15">
+            <Grid RowDefinitions="Auto,*" Padding="12,0,12,12">
+                <Label Text="Top repositories" FontSize="12"
+                       Opacity="0.7" Margin="0,0,0,4"
+                       SemanticProperties.HeadingLevel="Level2" />
+
+                <CollectionView Grid.Row="1" x:Name="TopList"
+                                ItemsSource="{Binding TopRepositories}"
+                                SelectedItem="{Binding SelectedTop, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Top repositories">
+                    <CollectionView.EmptyView>
+                        <Label Text="No repositories to jump to"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:GitHubRepository">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding FullName}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+        </Grid>
+
+        <a11y:Pane x:Name="FeedPane"
+                   Grid.Row="1" Grid.Column="1"
+                   PaneId="home-feed" PaneName="Feed" PaneOrder="20">
+            <Grid RowDefinitions="Auto,Auto,*" Padding="12">
+                <Label Text="{Binding FeedHeading}" FontSize="20"
+                       SemanticProperties.HeadingLevel="Level1" />
+
+                <VerticalStackLayout Grid.Row="1" IsVisible="{Binding IsSignedOut}"
+                                     Spacing="8" Margin="0,12,0,0">
+                    <Label FontSize="13" Opacity="0.8"
+                           Text="Sign in with a personal access token. On github.com go to Settings, Developer settings, Personal access tokens, and create one with the repo scope. GitApp will sign you in automatically next time." />
+                    <Entry x:Name="TokenEntry"
+                           Text="{Binding Token, Mode=TwoWay}"
+                           IsPassword="True"
+                           Placeholder="Personal access token"
+                           SemanticProperties.Description="Personal access token"
+                           SemanticProperties.Hint="Paste a token beginning with ghp underscore" />
+                    <HorizontalStackLayout Spacing="8">
+                        <Button Text="Sign in"
+                                Command="{Binding SignInCommand}"
+                                MinimumHeightRequest="32" />
+                        <Button Text="Create a token on github.com"
+                                Clicked="OnCreateToken"
+                                MinimumHeightRequest="32"
+                                SemanticProperties.Hint="Opens your browser at the token settings page" />
+                    </HorizontalStackLayout>
+                </VerticalStackLayout>
+
+                <CollectionView Grid.Row="2" x:Name="FeedList"
+                                IsVisible="{Binding IsSignedIn}"
+                                ItemsSource="{Binding Feed}"
+                                SelectedItem="{Binding SelectedEvent, Mode=TwoWay}"
+                                SelectionMode="Single"
+                                SemanticProperties.Description="Feed">
+                    <CollectionView.EmptyView>
+                        <Label Text="No activity to show"
+                               Padding="8" FontSize="13" Opacity="0.7" />
+                    </CollectionView.EmptyView>
+                    <CollectionView.ItemTemplate>
+                        <DataTemplate x:DataType="domain:ActivityEvent">
+                            <VerticalStackLayout Padding="8,6"
+                                                 SemanticProperties.Description="{Binding AccessibleName}">
+                                <Label Text="{Binding Summary}" FontSize="14" />
+                                <Label Text="{Binding Detail}" FontSize="12" Opacity="0.7" />
+                            </VerticalStackLayout>
+                        </DataTemplate>
+                    </CollectionView.ItemTemplate>
+                </CollectionView>
+            </Grid>
+        </a11y:Pane>
+
+        <Label x:Name="StatusLabel"
+               Grid.Row="2" Grid.ColumnSpan="2"
+               Padding="12,6" FontSize="14" Opacity="0.7" Text=""
+               SemanticProperties.Description="Status" />
+    </Grid>
+</ContentPage>

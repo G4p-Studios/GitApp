@@ -36,8 +36,9 @@ src/GitApp/           the MAUI app
   Accessibility/      Announcer, FocusManager, Pane, PlatformFocus
   Platforms/Windows/  the three things MAUI cannot do portably
   ViewModels/         hand-rolled MVVM, no toolkit
+  DashboardPage, CommandPalettePage, MainPage
 tests/GitApp.Core.Tests/
-docs/                 the specs; read ARCHITECTURE.md first
+docs/                 the specs; read ARCHITECTURE.md first. Home is docs/HOME.md
 ```
 
 ## Build, run, test
@@ -73,8 +74,9 @@ Warnings are errors in practice: the tree is at zero and should stay there.
   pattern.
 - **F6 cycles panes**; F7 moves between differences; Enter, Space, Left and
   Right fold; Escape backs out; Control+Enter posts what is being written
-  (`PaneNavigation.SubmitHandler`). Pane order leaves gaps (10, 20, 25,
-  30) so panes can be inserted.
+  (`PaneNavigation.SubmitHandler`); Control+Shift+P opens the command
+  palette (`docs/HOME.md`). Pane order leaves gaps (10, 20, 25, 30) so
+  panes can be inserted.
 - **A screen owns its panes and its keys.** `PaneNavigation.Attach(page)`
   runs on every appearance, clears the pane registry and the key handlers,
   and refills them from that page. Registering panes on a load event is not
@@ -108,6 +110,7 @@ that is not in the foreground: `docs/DEVELOPING.md`.
   system architecture, milestones. Start here.
 - `docs/DIFF-VIEWER.md` — the diff viewer, and why it deviates from VS Code.
 - `docs/GITHUB.md` — sign-in, token storage, and the remote repository list.
+- `docs/HOME.md` — the dashboard as the front door, the feed, and Control+Shift+P.
 - `docs/REPOSITORY-VIEW.md` — the github.com-style repository screen.
 - `docs/ISSUES.md` — issues and pull requests: reading, commenting,
   close and reopen, merge, review.
@@ -128,11 +131,14 @@ real repositories — add, remove, clone, status, stage, commit, fetch, pull,
 push, history, branch switching and creation, conflict resolution, and the
 diff viewer with folding.
 
-Milestone 3 is in progress: GitHub read. Sign-in by personal access token
-and the remote repository list are built and work (`docs/GITHUB.md`);
-browser sign-in is written but needs a registered OAuth client ID; the
-repository screen and file view are built (`docs/REPOSITORY-VIEW.md`);
-issues and pull requests are built (`docs/ISSUES.md`).
+Milestone 3 is in progress: GitHub read. The window opens on Home, a
+github.com-style dashboard: Places, Top repositories, and the received
+events feed. A stored token is restored on launch (`docs/HOME.md`).
+Sign-in by personal access token and the remote repository list are built
+and work (`docs/GITHUB.md`); browser sign-in is written but needs a
+registered OAuth client ID; the repository screen and file view are built
+(`docs/REPOSITORY-VIEW.md`); issues and pull requests are built
+(`docs/ISSUES.md`). Control+Shift+P is the command palette.
 
 Milestone 4, GitHub write, is built and awaiting live verification:
 commenting, close and reopen, merge with a method choice, and
