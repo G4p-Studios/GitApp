@@ -37,11 +37,21 @@
                    Grid.Row="1"
                    PaneId="notifications-inbox" PaneName="Inbox" PaneOrder="10">
             <Grid RowDefinitions="Auto,*" Padding="12">
-                <Label Grid.Row="0"
-                       Text="{Binding Heading}"
-                       FontSize="20"
-                       Margin="0,0,0,8"
-                       SemanticProperties.HeadingLevel="Level1" />
+                <!--
+                  A Button, not a Label: Mark read has to park focus here
+                  before it destroys the row, and a Label cannot take focus.
+                  HeadingLevel still marks it as the screen heading.
+                -->
+                <Button x:Name="InboxHeading"
+                        Grid.Row="0"
+                        Text="{Binding Heading}"
+                        FontSize="20"
+                        Margin="0,0,0,8"
+                        Padding="0"
+                        BackgroundColor="Transparent"
+                        BorderWidth="0"
+                        HorizontalOptions="Start"
+                        SemanticProperties.HeadingLevel="Level1" />
 
                 <CollectionView Grid.Row="1"
                                 x:Name="InboxList"

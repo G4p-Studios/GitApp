@@ -140,17 +140,17 @@ approve/request-changes reviews on the conversation screen
 (`docs/ISSUES.md`); the releases list and creating a release, opened
 from the About pane (`docs/RELEASES.md`).
 
-Milestone 5, notifications, is in progress. The polling and model layer is
-built and unit-tested in `GitApp.Core`: a conditional `GET /notifications`
-that honours `If-Modified-Since`, `X-Poll-Interval` and 304, a poll scheduler
-that backs off on secondary rate limits and decides which threads are new
-enough to announce, an inbox that merges polls in place, and the notification
-row model (`docs/NOTIFICATIONS.md`). The Windows toast, the background poll
-loop and the in-app inbox screen (`ToastModule`, `NotificationService`,
-`NotificationsPage`) are written but unverified: they are MAUI-app code, so
-they could not be built or heard on the Linux Cloud Agent this was written on.
-They need a Windows build and an NVDA pass before they count as done; the
-checklist is in `docs/NOTIFICATIONS.md`.
+Milestone 5, notifications, is built and heard in NVDA on Windows. The
+polling and model layer is unit-tested in `GitApp.Core`: a conditional
+`GET /notifications` that honours `If-Modified-Since`, `X-Poll-Interval`
+and 304, a poll scheduler that backs off on secondary rate limits and
+treats the first successful body as a baseline so opening the app does
+not toast the whole inbox, an inbox that merges polls in place, and the
+notification row model (`docs/NOTIFICATIONS.md`). The Windows toast, the
+background poll loop and the in-app inbox screen (`ToastModule`,
+`NotificationService`, `NotificationsPage`) were verified in NVDA Speech
+Viewer on an unpackaged build; toast activation and Open in browser were
+not. The checklist is in `docs/NOTIFICATIONS.md`.
 
 Known gaps, all recorded in the docs rather than hidden: Mac Catalyst is
 entirely unverified and the owner has no Mac to test it on; the live UI

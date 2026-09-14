@@ -130,8 +130,9 @@ public sealed class NotificationService
     }
 
     /// <summary>
-    /// Mark one thread read on GitHub and locally. The local change is in
-    /// place, so the row keeps its position and focus does not move.
+    /// Mark one thread read on GitHub and locally. The unread inbox then
+    /// drops the row, after moving focus onto a neighbour so the doomed
+    /// Mark read button is not the thing that disappears under the cursor.
     /// </summary>
     public async Task<bool> MarkReadAsync(GitHubNotification notification)
     {
@@ -146,10 +147,22 @@ public sealed class NotificationService
 
             if (result.Success && Inbox.MarkRead(notification.Id))
             {
-                InboxChanged?.Invoke(this, new InboxChange(
+                var change = new InboxChange(
                     Array.Empty<GitHubNotification>(),
                     new[] { notification with { Unread = false } },
-                    Array.Empty<string>()));
+                    Array.Empty<string>());
+
+                // Apply on the UI thread and wait, so the inbox can move
+                // focus off the doomed row before the announcer speaks.
+                var dispatcher = Application.Current?.Dispatcher;
+                if (dispatcher is not null && dispatcher.IsDispatchRequired)
+                {
+                    await dispatcher.DispatchAsync(() => InboxChanged?.Invoke(this, change));
+                }
+                else
+                {
+                    InboxChanged?.Invoke(this, change);
+                }
             }
 
             if (!result.Success)

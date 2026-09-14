@@ -144,6 +144,42 @@ public static partial class PlatformFocus
         }
     }
 
+    static partial void TryFocusElementPlatform(VisualElement element, ref bool handled)
+    {
+        if (element.Handler?.PlatformView is not FrameworkElement view)
+        {
+            return;
+        }
+
+        view.IsTabStop = true;
+        handled = view.Focus(FocusState.Programmatic);
+    }
+
+    static partial void SetLocalizedRolePlatform(VisualElement element, string role)
+    {
+        void Apply()
+        {
+            if (element.Handler?.PlatformView is FrameworkElement view)
+            {
+                WinAutomation.SetLocalizedControlType(view, role);
+            }
+        }
+
+        if (element.Handler?.PlatformView is FrameworkElement)
+        {
+            Apply();
+            return;
+        }
+
+        element.HandlerChanged += OnHandlerChanged;
+
+        void OnHandlerChanged(object? sender, EventArgs e)
+        {
+            element.HandlerChanged -= OnHandlerChanged;
+            Apply();
+        }
+    }
+
     static partial void DescribeEmptyViewPlatform(VisualElement element, string message)
     {
         void Apply()

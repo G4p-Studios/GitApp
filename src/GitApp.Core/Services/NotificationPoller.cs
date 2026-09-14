@@ -29,6 +29,7 @@ public sealed class NotificationPoller
     private readonly int _minIntervalSeconds;
     private readonly Dictionary<string, DateTimeOffset> _seen = new(StringComparer.Ordinal);
     private int _rateLimitStreak;
+    private bool _primed;
 
     /// <param name="minIntervalSeconds">
     /// This app's own floor, applied when it is larger than GitHub's. Defaults
@@ -67,6 +68,22 @@ public sealed class NotificationPoller
 
         if (page.NotModified)
         {
+            return Array.Empty<GitHubNotification>();
+        }
+
+        // The first successful body is a baseline, not news. Without this,
+        // opening the app toasts every unread thread at once, which floods
+        // the speech queue and buries anything the user could act on. Heard
+        // on the first Windows run: fifty toasts for an inbox that had been
+        // sitting there.
+        if (!_primed)
+        {
+            foreach (var notification in page.Items)
+            {
+                _seen[notification.Id] = notification.UpdatedAt;
+            }
+
+            _primed = true;
             return Array.Empty<GitHubNotification>();
         }
 

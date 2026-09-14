@@ -73,6 +73,19 @@ public sealed class NotificationsViewModel : ObservableObject
         }
     }
 
+    /// <summary>
+    /// Raised just before a selected row is removed, so the page can park
+    /// focus on the heading. The Mark read button lives inside the doomed
+    /// container; leaving it focused dumps onto Back (ARCHITECTURE 4.6).
+    /// </summary>
+    public event EventHandler? ParkFocus;
+
+    /// <summary>
+    /// Raised after a selected row was removed, so the page can put focus
+    /// on the neighbour.
+    /// </summary>
+    public event EventHandler? FocusNeeded;
+
     /// <summary>The row with this thread id, so a toast activation can land on it.</summary>
     public GitHubNotification? Find(string id) => Items.FirstOrDefault(n => n.Id == id);
 
@@ -97,6 +110,17 @@ public sealed class NotificationsViewModel : ObservableObject
         if (notification is null)
         {
             return;
+        }
+
+        // Park on the heading *before* the network call, and yield so WinUI
+        // actually moves focus. Focusing in the same stack as RemoveAt is
+        // ignored: the Mark read button is still focused when its row dies,
+        // and NVDA hears Back.
+        Selected = notification;
+        ParkFocus?.Invoke(this, EventArgs.Empty);
+        if (Application.Current?.Dispatcher is { } dispatcher)
+        {
+            await dispatcher.DispatchAsync(() => { });
         }
 
         if (await _service.MarkReadAsync(notification))
@@ -149,20 +173,42 @@ public sealed class NotificationsViewModel : ObservableObject
     {
         void Apply()
         {
+            Heading = _service.Inbox.Heading;
+
             foreach (var id in change.Removed)
             {
-                if (Items.FirstOrDefault(n => n.Id == id) is { } gone)
+                var index = IndexOf(id);
+                if (index < 0)
                 {
-                    Items.Remove(gone);
+                    continue;
                 }
+
+                RemoveAtKeepingFocus(index);
             }
 
             foreach (var updated in change.Updated)
             {
                 var index = IndexOf(updated.Id);
-                if (index >= 0)
+                if (index < 0)
                 {
-                    Items[index] = updated;
+                    continue;
+                }
+
+                // This screen is the unread inbox. A thread that is now read
+                // leaves the list rather than sitting there looking identical
+                // with an empty unread marker. Removing keeps the remaining
+                // rows' containers intact; replacing the record would rebuild
+                // the focused one and dump focus onto Back.
+                if (!updated.Unread)
+                {
+                    RemoveAtKeepingFocus(index);
+                    continue;
+                }
+
+                Items[index] = updated;
+                if (Selected?.Id == updated.Id)
+                {
+                    Selected = updated;
                 }
             }
 
@@ -175,13 +221,43 @@ public sealed class NotificationsViewModel : ObservableObject
             MarkAllReadCommand.RaiseCanExecuteChanged();
         }
 
-        if (Application.Current?.Dispatcher is { } dispatcher)
+        // Run inline when we are already on the UI thread so Mark read can
+        // move focus off the doomed row *before* returning to announce.
+        // Dispatching from here used to let the Back button speak first.
+        if (Application.Current?.Dispatcher is { } dispatcher && dispatcher.IsDispatchRequired)
         {
             dispatcher.Dispatch(Apply);
         }
         else
         {
             Apply();
+        }
+    }
+
+    /// <summary>
+    /// Drop the row, then land on a neighbour. Focus was parked on the
+    /// heading before the network call, so this remove does not destroy
+    /// the focused control.
+    /// </summary>
+    private void RemoveAtKeepingFocus(int index)
+    {
+        var wasSelected = Selected?.Id == Items[index].Id;
+        if (wasSelected)
+        {
+            Selected = Items.Count <= 1
+                ? null
+                : Items[index < Items.Count - 1 ? index + 1 : index - 1];
+        }
+
+        Items.RemoveAt(index);
+        if (Items.Count == 0)
+        {
+            Selected = null;
+        }
+
+        if (wasSelected)
+        {
+            FocusNeeded?.Invoke(this, EventArgs.Empty);
         }
     }
 

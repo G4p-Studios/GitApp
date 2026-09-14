@@ -356,13 +356,26 @@ public class NotificationTests
     }
 
     [Fact]
+    public void TheFirstPollIsABaselineAndDoesNotAnnounce()
+    {
+        // Opening the app is not "something just arrived". Toasting the whole
+        // inbox at once floods the speech queue; heard on the first Windows run.
+        var poller = new NotificationPoller();
+        var now = DateTimeOffset.UnixEpoch;
+
+        var first = poller.Observe(Page(Sample("1"), Sample("2")), now);
+
+        Assert.Empty(first);
+    }
+
+    [Fact]
     public void OnlyNewUnreadNotificationsAreWorthAnnouncing()
     {
         var poller = new NotificationPoller();
         var now = DateTimeOffset.UnixEpoch;
 
         var first = poller.Observe(Page(Sample("1", unread: true), Sample("2", unread: true)), now);
-        Assert.Equal(2, first.Count);
+        Assert.Empty(first);
 
         // The same two come back next poll; neither is new any more.
         var second = poller.Observe(Page(Sample("1", unread: true), Sample("2", unread: true)), now.AddMinutes(2));
@@ -394,8 +407,10 @@ public class NotificationTests
     public void AReadThreadIsNotAnnouncedEvenWhenNew()
     {
         var poller = new NotificationPoller();
+        var now = DateTimeOffset.UnixEpoch;
+        poller.Observe(Page(Sample("1")), now);
 
-        var fresh = poller.Observe(Page(Sample("1", unread: false)), DateTimeOffset.UnixEpoch);
+        var fresh = poller.Observe(Page(Sample("1"), Sample("2", unread: false)), now.AddMinutes(2));
 
         Assert.Empty(fresh);
     }

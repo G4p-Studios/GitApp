@@ -1,12 +1,12 @@
 # Notifications
 
-Status: 2026-09-11. Milestone 5. The polling and model layer is built and
+Status: 2026-09-14. Milestone 5. The polling and model layer is built and
 unit-tested in `GitApp.Core`. The Windows toast, the poll loop, and the in-app
-inbox screen are written but **unverified**: they live in the MAUI app, which
-targets Windows and macOS and cannot be built or screen-reader-tested on the
-Linux Cloud Agent. Nothing in the toast-and-inbox section below counts as done
-under the one rule in `AGENTS.md` until a Windows run confirms it in NVDA. The
-Windows checklist is at the end.
+inbox were verified in NVDA Speech Viewer on an unpackaged Windows build
+against a live account. Narrator has not been run. Toast *activation* (click
+the toast, land on that row) and Open in browser were not verified: the
+former is hard to drive from a script, and the latter steals the foreground.
+The checklist at the end records what was heard.
 
 ## What is built and tested (GitApp.Core)
 
@@ -22,19 +22,21 @@ Windows checklist is at the end.
   poll result, and the API-url-to-web-url mapping, each testable without a
   window.
 
-## What is written but unverified (the MAUI app)
+## What the MAUI app does
 
 - `ToastModule` — a Windows toast per new notification, over Windows App SDK
   app notifications, with a portable no-op default. Activation carries the
-  thread id back so a toast opens the inbox on the right row.
+  thread id back so a toast opens the inbox on the right row. Toasts appear
+  unpackaged; clicking one to land on that row is still unverified.
 - `NotificationService` — the app-wide background poll loop: a dispatcher timer
   that wakes every fifteen seconds, asks the scheduler whether a poll is due,
   and drives the client, the poller, the inbox and the toast. Self-guarding, so
-  it idles while signed out.
+  it idles while signed out. The first successful body is a baseline, so
+  opening the app does not toast the whole inbox.
 - `NotificationsPage` and `NotificationsViewModel` — the inbox screen, an F6
   `Inbox` pane listing unread notifications newest first, each openable on
   github.com or markable read. Reached from a Notifications button on the
-  GitHub screen.
+  GitHub screen. Heard in NVDA; see the checklist.
 
 ## Polling done the way GitHub asks
 
@@ -82,6 +84,12 @@ announcing only when it is **new or newly changed, and still unread**:
 A thread that arrives already read, or comes back unchanged on the next poll,
 raises nothing. This is verified in `NotificationTests`.
 
+The first successful body is a **baseline**, not news. Without that, opening
+the app toasted every unread thread at once (heard on the first Windows run:
+fifty toasts, speech flooded). `Observe` seeds `_seen` on that first body and
+returns nothing to announce. Later polls still toast threads that are new or
+whose `updated_at` moved.
+
 ## Backoff
 
 A failed poll does not just retry on the same beat.
@@ -123,32 +131,42 @@ underscore is not something the listener can act on. An unfamiliar reason falls
 back to its own words with the underscores spoken as spaces
 (`NotificationReason.Word`).
 
-## The Windows checklist — what a run still has to confirm
+## The Windows checklist — heard 2026-09-14 in NVDA
 
-None of the MAUI code above has been compiled or heard, because the Cloud Agent
-is Linux and the app targets Windows. A Windows run has to confirm, in NVDA and
-Narrator both:
+Unpackaged `net10.0-windows10.0.19041.0` build, zero warnings, signed in.
+Speech Viewer via `WM_GETTEXT` on the RICHEDIT child (the frame caption is
+not the speech). Discord toasts in the same buffer were ignored.
 
-- **It builds.** `dotnet build src/GitApp/GitApp.csproj -f
-  net10.0-windows10.0.19041.0` with the tree still at zero warnings. The toast
-  module assumes the Windows App SDK's `Microsoft.Windows.AppNotifications`
-  namespace is on the Windows target; confirm it resolves.
-- **The toast appears and reads.** A new notification raises a toast whose title
-  and body are spoken as words, in the same content order as the inbox row.
-  Because the app is unpackaged (`WindowsPackageType=None`), confirm
-  `AppNotificationManager.Register()` succeeds; ARCHITECTURE 4.4 anticipates a
-  sparse package for persistent identity, which activation after exit needs.
-- **Activation lands on the item.** Invoking a toast opens the inbox with focus
-  on the notification it named, not on the window root or the list top.
-- **The inbox reads as a screen, not a duplicate.** F6 reaches the Inbox pane
-  and announces it; rows read content-first with unread as a separate element;
-  a background poll that updates the list does not move the cursor or re-read
-  rows the user already heard (ARCHITECTURE 3.3, 3.5, 4.6). The diff viewer's
-  double-speak is the failure to watch for — read the Speech Viewer, not just
-  the tree.
-- **Mark read and open behave.** Mark read updates the row and the heading in
-  place; open reaches github.com; the toast does not also speak on top of the
-  screen reader reading it.
+- **It builds.** Confirmed. `AppNotificationManager.Register()` succeeded
+  unpackaged: toasts appeared as `GitApp, {title}, {reason}, {subject}, in
+  {repo}. window`.
+- **The first poll does not toast the inbox.** Confirmed after the baseline
+  change. Opening GitHub showed 59 repositories and zero toast-like
+  `GitApp, … window` lines.
+- **The inbox reads as a screen.** Opening it spoke `Inbox grouping`,
+  `Notifications list`, the first row as `1 of 50`, then `Inbox pane`.
+  Arrow down spoke each row once, content-first, with set position. No
+  double-speak. Unread is a separate `Text: unread` child in the UIA tree;
+  it is not in `AccessibleName` and is not a tab stop, so arrowing the list
+  does not say "unread". That matches 3.3; this screen is unread-only, so
+  the marker would be the same word on every row.
+- **F6 reaches the Inbox pane.** The screen has one pane, and chrome (Back,
+  Refresh, Mark all read) sits outside it. `CyclePane` used to no-op when
+  `_panes.Count < 2`, which stranded focus on Back. It now re-enters the
+  only pane. From Back, F6 restored the last control inside the list and
+  announced `Inbox pane`.
+- **Mark read.** The unread inbox removes the row (it does not sit there
+  looking identical). Destroying the focused Mark read button dumped onto
+  Back and NVDA spoke that first. The fix parks focus on the heading
+  *before* the network call, yields so WinUI actually moves it, then
+  restores onto the neighbour after the row is gone. Heard:
+  `{count} unread notifications`, the neighbour as `3 of 49`, then
+  `Marked read. {title}`. Focus afterwards was the neighbour list item.
+  Heading count followed the GitHub call.
+- **Still unverified.** Toast activation landing on that thread. Open in
+  browser (would steal the foreground). Narrator. Paging past GitHub's
+  first 50. The signed-in Account pane still exposes the personal access
+  token field (pre-existing; not introduced here).
 
 ## Live verification against a real account
 

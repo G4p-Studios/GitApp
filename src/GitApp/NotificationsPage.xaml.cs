@@ -19,6 +19,26 @@ public partial class NotificationsPage : ContentPage
 
         PlatformFocus.TrackFocusWithin(InboxList, "notifications-inbox");
         PlatformFocus.DescribeEmptyView(InboxList, "No unread notifications");
+        PlatformFocus.SetLocalizedRole(InboxHeading, "heading");
+
+        _vm.ParkFocus += (_, _) => PlatformFocus.TryFocusElement(InboxHeading);
+        _vm.FocusNeeded += (_, _) => RestoreListFocus();
+    }
+
+    private void RestoreListFocus()
+    {
+        // Push the new selection into the CollectionView before focusing it.
+        // The two-way binding can lag a tick, and TryFocusSelectedItem looks
+        // at the platform IsSelected flag, not the view-model property.
+        InboxList.SelectedItem = _vm.Selected;
+
+        if (_vm.Selected is not null)
+        {
+            PlatformFocus.TryFocusSelectedItem(InboxList);
+            return;
+        }
+
+        PlatformFocus.TryFocusFirstDescendant(InboxList);
     }
 
     protected override void OnAppearing()

@@ -61,6 +61,25 @@ public static partial class PlatformFocus
     static partial void TryFocusSelectedItemPlatform(VisualElement element, ref bool handled);
 
     /// <summary>
+    /// Focus a specific element, including labels that are not tab stops.
+    /// Used to park focus outside a CollectionView before a row is removed,
+    /// so destroying the focused Mark read button does not dump onto Back.
+    /// </summary>
+    public static bool TryFocusElement(VisualElement element)
+    {
+        var handled = false;
+        TryFocusElementPlatform(element, ref handled);
+        if (handled)
+        {
+            return true;
+        }
+
+        return element.Focus();
+    }
+
+    static partial void TryFocusElementPlatform(VisualElement element, ref bool handled);
+
+    /// <summary>
     /// Give an empty list's placeholder something to say.
     ///
     /// A CollectionView with no items still holds one tab stop: the control
@@ -79,4 +98,13 @@ public static partial class PlatformFocus
         DescribeEmptyViewPlatform(element, message);
 
     static partial void DescribeEmptyViewPlatform(VisualElement element, string message);
+
+    /// <summary>
+    /// Override the spoken control type, so a Button used as a heading is
+    /// heard as a heading rather than as a button.
+    /// </summary>
+    public static void SetLocalizedRole(VisualElement element, string role) =>
+        SetLocalizedRolePlatform(element, role);
+
+    static partial void SetLocalizedRolePlatform(VisualElement element, string role);
 }

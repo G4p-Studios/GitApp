@@ -139,9 +139,18 @@ public sealed class FocusManager
     /// </summary>
     public PaneRegistration? CyclePane(int direction)
     {
-        if (_panes.Count < 2)
+        // One pane still has to be reachable. The notifications inbox has
+        // Back / Refresh sitting outside it, and F6 is how you return from
+        // those. Doing nothing when Count < 2 left the user stranded on Back.
+        if (_panes.Count == 0)
         {
             return null;
+        }
+
+        if (_panes.Count == 1)
+        {
+            Enter(_panes[0], announce: true);
+            return _panes[0];
         }
 
         var currentIndex = _panes.FindIndex(p => p.Id == _activePaneId);
